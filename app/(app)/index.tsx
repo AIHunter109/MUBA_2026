@@ -98,8 +98,8 @@ export default function HomeScreen() {
           </View>
           {balances === null ? (balanceError ? <Text className="text-sm leading-5 text-amber-200">{balanceError}</Text> : <ActivityIndicator color="#94a3b8" />) : (
             <View className="gap-3">
-              {usdcBalance ? <View className="flex-row items-end justify-between"><View><Text className="text-4xl font-bold tracking-tight text-white md:text-5xl">{fromBaseUnits(BigInt(usdcBalance.balance), usdcBalance.decimals)}</Text><Text className="mt-1 text-sm font-semibold text-blue-300">USDC</Text><Text className="mt-2 text-xs text-slate-500">Approx. MYR value unavailable</Text></View></View> : null}
-              {suiBalance ? <View className="flex-row items-baseline justify-between border-t border-slate-800 pt-3"><Text className="text-lg font-semibold text-slate-300">{fromBaseUnits(BigInt(suiBalance.balance), suiBalance.decimals)} <Text className="text-sm text-slate-500">SUI</Text></Text><Text className="text-xs text-slate-500">Network gas</Text></View> : null}
+              {usdcBalance ? <View className="flex-row items-end justify-between"><View><Text className="text-3xl font-bold tracking-tight text-white md:text-4xl">{fromBaseUnits(BigInt(usdcBalance.balance), usdcBalance.decimals)}</Text><Text className="mt-1 text-sm font-semibold text-blue-300">USDC</Text></View></View> : null}
+              {suiBalance ? <View className="flex-row items-baseline justify-between border-t border-slate-800 pt-3"><Text className="text-3xl font-bold tracking-tight text-slate-300 md:text-4xl">{fromBaseUnits(BigInt(suiBalance.balance), suiBalance.decimals)} <Text className="text-sm text-slate-500">SUI</Text></Text><Text className="text-xs text-slate-500">Network gas</Text></View> : null}
             </View>
           )}
           <View className="flex-row gap-2 pt-1">
