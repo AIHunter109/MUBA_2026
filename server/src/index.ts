@@ -158,6 +158,18 @@ const server = createServer((request, response) => {
   writeApiError(response, 404, 'NOT_FOUND', 'Route not found', requestId);
 });
 
+server.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(
+      `\nPort ${environment.SERVER_PORT} is already in use - another RemitGuard API is probably still running.\n` +
+        `Stop it, or free the port:  npx kill-port ${environment.SERVER_PORT}\n` +
+        `(Windows: netstat -ano | findstr :${environment.SERVER_PORT}  then  taskkill /PID <pid> /F)\n`,
+    );
+    process.exit(1);
+  }
+  throw error;
+});
+
 server.listen(environment.SERVER_PORT, () => {
   console.log(`RemitGuard API listening on port ${environment.SERVER_PORT} (all interfaces)`);
 });
