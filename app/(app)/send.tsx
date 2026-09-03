@@ -1,16 +1,8 @@
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
-import { Stack, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Linking, Pressable, Text, TextInput, View } from 'react-native';
 
+import { Screen } from '@/components/screen';
 import { useAuth } from '@/lib/auth/auth-context';
 import { type CoinMeta, SUI_COIN, SUPPORTED_COINS, toBaseUnits, USDC_COIN } from '@/lib/sui/coins';
 import { explorerTxUrl } from '@/lib/sui/network';
@@ -19,7 +11,6 @@ import { executeTransfer, type TransferOutcome } from '@/lib/sui/transfer';
 type Phase = 'form' | 'submitting' | 'done';
 
 export default function SendScreen() {
-  const router = useRouter();
   const { getSigner } = useAuth();
 
   const [coin, setCoin] = useState<CoinMeta>(USDC_COIN);
@@ -33,6 +24,14 @@ export default function SendScreen() {
     () => recipient.trim().length > 0 && amount.trim().length > 0 && phase === 'form',
     [recipient, amount, phase],
   );
+
+  const reset = useCallback(() => {
+    setPhase('form');
+    setOutcome(null);
+    setError(null);
+    setAmount('');
+    setRecipient('');
+  }, []);
 
   const onSubmit = useCallback(async () => {
     setError(null);
@@ -63,17 +62,7 @@ export default function SendScreen() {
   if (phase === 'done' && outcome) {
     const ok = outcome.status === 'success';
     return (
-      <ScrollView className="flex-1 bg-slate-950" contentContainerClassName="gap-6 px-5 py-8">
-        <Stack.Screen
-          options={{
-            title: 'Send',
-            headerShown: true,
-            headerStyle: { backgroundColor: '#020617' },
-            headerTintColor: '#f8fafc',
-            headerTitleStyle: { color: '#f8fafc' },
-          }}
-        />
-
+      <Screen gap={24}>
         <Text className={`text-3xl font-bold ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
           {ok ? 'Transfer settled' : 'Transfer failed on chain'}
         </Text>
@@ -104,30 +93,23 @@ export default function SendScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(app)'))}
+          onPress={reset}
           className="items-center rounded-xl bg-blue-600 px-5 py-4 active:bg-blue-500"
         >
-          <Text className="text-base font-bold text-white">Back to Home</Text>
+          <Text className="text-base font-bold text-white">Send another</Text>
         </Pressable>
-      </ScrollView>
+      </Screen>
     );
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-slate-950"
-      contentContainerClassName="gap-6 px-5 py-8"
-      keyboardShouldPersistTaps="handled"
-    >
-      <Stack.Screen
-        options={{
-          title: 'Send',
-          headerShown: true,
-          headerStyle: { backgroundColor: '#020617' },
-          headerTintColor: '#f8fafc',
-          headerTitleStyle: { color: '#f8fafc' },
-        }}
-      />
+    <Screen gap={24} keyboardShouldPersistTaps="handled">
+      <View className="gap-1">
+        <Text className="text-3xl font-bold tracking-tight text-white">Send</Text>
+        <Text className="text-sm leading-5 text-slate-400">
+          Choose an asset, enter a recipient and amount.
+        </Text>
+      </View>
 
       <View className="flex-row gap-2">
         {SUPPORTED_COINS.map((option) => {
@@ -156,6 +138,7 @@ export default function SendScreen() {
           value={recipient}
           onChangeText={setRecipient}
           placeholder="0x..."
+          placeholderTextColor="#475569"
           autoCapitalize="none"
           autoCorrect={false}
           editable={phase === 'form'}
@@ -175,6 +158,7 @@ export default function SendScreen() {
           value={amount}
           onChangeText={setAmount}
           placeholder="0.00"
+          placeholderTextColor="#475569"
           keyboardType="decimal-pad"
           editable={phase === 'form'}
           className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-lg text-slate-100"
@@ -210,6 +194,6 @@ export default function SendScreen() {
         This build signs and submits directly from the app. Backend confirmation, sponsorship, and
         the AI safety review come in later phases.
       </Text>
-    </ScrollView>
+    </Screen>
   );
 }

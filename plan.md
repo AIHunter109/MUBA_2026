@@ -8,8 +8,10 @@ Build RemitGuard as a real Expo 54 client backed by a separate Node/TypeScript s
 - Backend: separate Node/TypeScript API with a worker/scheduler. Use Postgres with Prisma unless the contract-discovery spike finds a hosting constraint.
 - Identity: Enoki zkLogin with Google, one active account per device, sign-out supported. Do not put Gonka secrets or private signing material in Expo.
 - Chain: Sui testnet and existing testnet USDC only. Use Enoki sponsorship when its current Expo 54-compatible flow is confirmed; retain an unsponsored development fallback.
-- Platforms: Android, iOS, and web. Treat web auth/wallet behavior as a separately verified adapter rather than assuming native parity.
-- Navigation: Home, Send, Activity, Recipients. Home emphasizes balance and the next action.
+- Platforms: iOS, Android, and web are all first-class shipping targets and all are demoed. The app must work properly on each; a change that only works on one is not finished. Verify every change on iPhone (Expo Go or dev build), an Android device/emulator, and a browser at wide and narrow widths.
+- Platform-adaptive UI: a native bottom tab bar on iOS/Android via `NativeTabs` in `app/(app)/_layout.tsx` (system tab bar / Liquid Glass, SF Symbols); a left sidebar on wide web and a bottom bar on narrow web in `app/(app)/_layout.web.tsx`. Every screen respects device safe areas (notch, home indicator, translucent tab bar) via `components/screen.tsx`.
+- Platform-specific auth/wallet behavior is built as explicit per-platform adapters behind one interface (e.g. real web zkLogin, native demo wallet), never assumed to be at parity.
+- Navigation surfaces: Home, Send, Recipients, History, Settings (native bottom bar caps at 5). Home emphasizes balance and the next action.
 - Visual system: calm and trustworthy; light-first; expressive editorial sans for interface text and monospace for addresses, request IDs, and transaction data. Use restrained neutral surfaces with emerald/teal success accents and amber safety warnings. No fear-based fraud claims.
 - Safety UX: flagged or disputed transfers go to a review screen showing both model outcomes, rationales, recipient status, and request IDs. The user must deliberately choose Continue anyway; the system never silently blocks or auto-executes.
 - Demo mode: an explicit feature flag selects deterministic fixtures when external services are unavailable, while keeping real integration paths intact.
@@ -76,7 +78,7 @@ Two `AuthClient` implementations sit behind `resolveAuthClient()` in `lib/auth/a
 20. Build Home around balance, next upcoming payment, primary Send action, safety status, recent activity, and a compact deterministic spending summary. Keep sections scannable and avoid dashboard card nesting.
 21. Build Send as a conversational instruction composer with recipient suggestions, amount/currency context, one-time versus monthly choice, and clear progress states. The screen only orchestrates API calls; it does not parse or calculate.
 22. Build Activity with transaction filters and detail navigation. Build Recipients with add/edit/delete, wallet-address validation, known-recipient status, and a clear first-time-recipient treatment.
-23. Validate responsive layouts and platform-specific keyboard, safe-area, focus, screen-reader, and web-navigation behavior. Keep light theme polished before considering dark mode.
+23. Validate responsive layouts and platform-specific keyboard, safe-area, focus, and screen-reader behavior on all three platforms. Confirm the native bottom tab bar (iOS/Android) and the web sidebar/bottom-bar switch each render correctly, clear the notch and home indicator, and navigate to every accessible page.
 
 ### Phase 4: Intent Parsing and Dual-AI Safety
 
@@ -124,7 +126,7 @@ Two `AuthClient` implementations sit behind `resolveAuthClient()` in `lib/auth/a
 2. Unit-test pure consensus/risk logic, recipient resolution, amount/intent validation, monthly date calculation, timezone behavior, reconciliation matching, skip semantics, idempotency, and spending aggregation.
 3. API-test auth ownership, Gonka response normalization, request IDs, confirmation-token enforcement, error mapping, and mocked Sui/Enoki failures.
 4. Run a real funded Sui testnet transfer and verify digest, explorer URL, final status, asset amount, and sponsored gas behavior.
-5. Manually verify native and web sign-in, tab navigation, keyboard/safe-area behavior, loading/error states, disputed-review override, recipient CRUD, recurring prompt choices, and dashboard totals.
+5. Manually verify on iPhone, Android, and a browser (wide and narrow): sign-in, the platform-appropriate navigation (native tab bar vs web sidebar/bottom bar), safe-area padding, keyboard behavior, loading/error states, disputed-review override, recipient CRUD, recurring prompt choices, and dashboard totals.
 6. Run the complete demo rehearsal twice: once with real services and once with demo mode, confirming the UI clearly distinguishes fixture state from chain-settled state.
 
 ## Explicit Exclusions
