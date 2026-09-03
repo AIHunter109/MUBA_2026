@@ -23,6 +23,14 @@ export type AuthSession = {
   isDemo: boolean;
 };
 
+/** Thrown when the user backs out of the sign-in flow (closes the OAuth window). */
+export class AuthCancelledError extends Error {
+  constructor() {
+    super('Sign-in was cancelled.');
+    this.name = 'AuthCancelledError';
+  }
+}
+
 export interface AuthClient {
   /** Runs the provider-specific sign-in and returns a persisted-ready session. */
   signIn(): Promise<AuthSession>;

@@ -1,9 +1,7 @@
-import type { SuiClientTypes } from '@mysten/sui/client';
 import type { Signer } from '@mysten/sui/cryptography';
-import { coinWithBalance, Transaction } from '@mysten/sui/transactions';
-import { isValidSuiAddress } from '@mysten/sui/utils';
+import { fromBase64, isValidSuiAddress } from '@mysten/sui/utils';
 
-import { getSuiClient } from './sui-client';
+import { apiPost } from './api';
 
 export type TransferInput = {
   recipient: string;
@@ -17,25 +15,11 @@ export type TransferOutcome = {
   error?: string;
 };
 
-type TxResult = SuiClientTypes.TransactionResult<{ effects: true }>;
-
-function unwrap(result: TxResult): SuiClientTypes.Transaction<{ effects: true }> {
-  return result.$kind === 'Transaction' ? result.Transaction : result.FailedTransaction;
-}
-
-function describeError(error: unknown): string {
-  if (!error) {
-    return 'Transaction failed on chain.';
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-  if (typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
-    return error.message;
-  }
-  return JSON.stringify(error);
-}
-
+/**
+ * The backend builds and submits the transaction (it holds the only working Sui
+ * transport). The client only signs the prepared bytes with the wallet key, so
+ * no signing material ever leaves the device.
+ */
 export async function executeTransfer(signer: Signer, input: TransferInput): Promise<TransferOutcome> {
   if (!isValidSuiAddress(input.recipient)) {
     throw new Error('Recipient is not a valid Sui address.');
@@ -49,27 +33,14 @@ export async function executeTransfer(signer: Signer, input: TransferInput): Pro
     throw new Error('Recipient must be a different address.');
   }
 
-  const client = getSuiClient();
-
-  const tx = new Transaction();
-  tx.setSender(sender);
-  tx.transferObjects(
-    [coinWithBalance({ type: input.coinType, balance: input.amountBaseUnits })],
-    input.recipient,
-  );
-
-  const executed = await client.core.signAndExecuteTransaction({
-    signer,
-    transaction: tx,
-    include: { effects: true },
+  const { transactionBytes } = await apiPost<{ transactionBytes: string }>('/v1/transfer/prepare', {
+    sender,
+    recipient: input.recipient,
+    coinType: input.coinType,
+    amountBaseUnits: input.amountBaseUnits.toString(),
   });
 
-  const digest = unwrap(executed).digest;
-  const settled = unwrap(await client.core.waitForTransaction({ digest, include: { effects: true } }));
+  const { signature } = await signer.signTransaction(fromBase64(transactionBytes));
 
-  return {
-    digest,
-    status: settled.status.success ? 'success' : 'failure',
-    error: settled.status.success ? undefined : describeError(settled.status.error),
-  };
+  return apiPost<TransferOutcome>('/v1/transfer/execute', { transactionBytes, signature });
 }

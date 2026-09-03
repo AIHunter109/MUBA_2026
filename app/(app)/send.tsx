@@ -96,7 +96,7 @@ export default function SendScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(app)/index'))}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
           className="items-center rounded-xl bg-emerald-700 px-5 py-4 active:bg-emerald-800"
         >
           <Text className="text-base font-bold text-white">Back to Home</Text>

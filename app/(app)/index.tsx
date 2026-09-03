@@ -3,45 +3,26 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { useAuth } from '@/lib/auth/auth-context';
-import { fromBaseUnits, SUI_COIN, SUPPORTED_COINS, USDC_COIN } from '@/lib/sui/coins';
+import { apiGet } from '@/lib/sui/api';
+import { fromBaseUnits, SUI_COIN, USDC_COIN } from '@/lib/sui/coins';
 import { requestTestnetSui } from '@/lib/sui/faucet';
-import { getSuiClient } from '@/lib/sui/sui-client';
 
 function shortAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-type Balances = Record<string, bigint>;
+type BalanceRow = { coinType: string; symbol: string; decimals: number; balance: string };
 
-async function fetchBalances(address: string): Promise<Balances> {
-  const client = getSuiClient();
-  const results = await Promise.allSettled(
-    SUPPORTED_COINS.map((coin) => client.core.getBalance({ owner: address, coinType: coin.type })),
+async function fetchBalances(address: string): Promise<BalanceRow[]> {
+  const { balances } = await apiGet<{ balances: BalanceRow[] }>(
+    `/v1/balances?owner=${encodeURIComponent(address)}`,
   );
-
-  const balances: Balances = {};
-  let failures = 0;
-  results.forEach((result, index) => {
-    const coinType = SUPPORTED_COINS[index].type;
-    if (result.status === 'fulfilled') {
-      balances[coinType] = BigInt(result.value.balance.balance);
-    } else {
-      failures += 1;
-      balances[coinType] = 0n;
-    }
-  });
-
-  if (failures === SUPPORTED_COINS.length) {
-    const first = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-    throw first?.reason instanceof Error ? first.reason : new Error('Balance lookup failed.');
-  }
-
   return balances;
 }
 
 export default function HomeScreen() {
   const { session, signOut } = useAuth();
-  const [balances, setBalances] = useState<Balances | null>(null);
+  const [balances, setBalances] = useState<BalanceRow[] | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [faucetBusy, setFaucetBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -57,7 +38,7 @@ export default function HomeScreen() {
       setBalances(await fetchBalances(address));
       setNotice(null);
     } catch (error) {
-      setBalances((current) => current ?? {});
+      setBalances((current) => current ?? []);
       setNotice(
         error instanceof Error
           ? `Could not load balances: ${error.message}`
@@ -111,17 +92,17 @@ export default function HomeScreen() {
 
       <View className="gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-5">
         <Text className="text-sm text-slate-500">Testnet balances</Text>
-        {balances ? (
-          SUPPORTED_COINS.map((coin) => (
-            <View key={coin.type} className="flex-row items-baseline justify-between">
+        {balances === null ? (
+          <ActivityIndicator />
+        ) : (
+          balances.map((row) => (
+            <View key={row.coinType} className="flex-row items-baseline justify-between">
               <Text className="text-2xl font-bold text-slate-950">
-                {fromBaseUnits(balances[coin.type] ?? 0n, coin.decimals)}
+                {fromBaseUnits(BigInt(row.balance), row.decimals)}
               </Text>
-              <Text className="text-sm font-medium text-slate-500">{coin.symbol}</Text>
+              <Text className="text-sm font-medium text-slate-500">{row.symbol}</Text>
             </View>
           ))
-        ) : (
-          <ActivityIndicator />
         )}
         <Text className="text-xs text-slate-400">
           {USDC_COIN.symbol} is what RemitGuard sends. {SUI_COIN.symbol} pays the network fee.

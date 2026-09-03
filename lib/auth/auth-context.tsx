@@ -14,7 +14,7 @@ import { demoAuthClient } from './demo-auth';
 import { enokiAuthClient } from './enoki-auth';
 import { AUTH_MODE } from './enoki-config';
 import { clearAuthSession, loadAuthSession, saveAuthSession } from './session-store';
-import type { AuthClient, AuthSession } from './types';
+import { AuthCancelledError, type AuthClient, type AuthSession } from './types';
 
 function resolveAuthClient(): AuthClient {
   // AUTH_MODE is 'enoki' only on web with credentials present and demo mode off
@@ -80,8 +80,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       await saveAuthSession(next);
       setSession(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed. Please try again.');
-      throw err;
+      if (!(err instanceof AuthCancelledError)) {
+        setError(err instanceof Error ? err.message : 'Sign-in failed. Please try again.');
+      }
     } finally {
       setIsAuthenticating(false);
     }
