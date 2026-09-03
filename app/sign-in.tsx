@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 
-import { DEMO_MODE } from '@/lib/auth/enoki-config';
 import { useAuth } from '@/lib/auth/auth-context';
+import { DEMO_MODE, isEnokiConfigured } from '@/lib/auth/enoki-config';
 
 export default function SignInScreen() {
   const { signIn, isAuthenticating, error } = useAuth();
@@ -47,9 +47,9 @@ export default function SignInScreen() {
         <View className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <Text className="font-semibold text-amber-950">Demo mode</Text>
           <Text className="mt-1 text-sm leading-5 text-amber-900">
-            Enoki is not configured yet, so sign-in generates a local testnet wallet with
-            no Google account. Real zkLogin activates once the Enoki API key and Google
-            client ID are set.
+            {isEnokiConfigured && Platform.OS !== 'web'
+              ? 'Real Google zkLogin runs on web for now. On this device, sign-in creates a local testnet wallet with no Google account.'
+              : 'Enoki is not configured, so sign-in creates a local testnet wallet with no Google account.'}
           </Text>
         </View>
       ) : null}

@@ -41,4 +41,11 @@ export const demoAuthClient: AuthClient = {
   async signOut(): Promise<void> {
     // Nothing to revoke for a local ephemeral key.
   },
+
+  async getSigner(session): Promise<Ed25519Keypair> {
+    if (!session.demoSecretKey) {
+      throw new Error('This demo session has no signing key. Sign out and sign in again.');
+    }
+    return Ed25519Keypair.fromSecretKey(session.demoSecretKey);
+  },
 };

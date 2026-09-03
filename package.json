@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "server": "tsx server/src/index.ts",
+    "server": "tsx --env-file-if-exists=server/.env server/src/index.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
     "prisma:validate": "prisma validate",

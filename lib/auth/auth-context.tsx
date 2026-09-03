@@ -8,15 +8,18 @@ import {
   type PropsWithChildren,
 } from 'react';
 
+import type { Signer } from '@mysten/sui/cryptography';
+
 import { demoAuthClient } from './demo-auth';
+import { enokiAuthClient } from './enoki-auth';
+import { AUTH_MODE } from './enoki-config';
 import { clearAuthSession, loadAuthSession, saveAuthSession } from './session-store';
 import type { AuthClient, AuthSession } from './types';
 
 function resolveAuthClient(): AuthClient {
-  // Only the demo client is wired today. The Enoki client slots in here once
-  // EXPO_PUBLIC_ENOKI_API_KEY and EXPO_PUBLIC_GOOGLE_CLIENT_ID are configured
-  // (see lib/auth/enoki-config.ts AUTH_MODE).
-  return demoAuthClient;
+  // AUTH_MODE is 'enoki' only on web with credentials present and demo mode off
+  // (see lib/auth/enoki-config.ts). Native always uses the local demo wallet.
+  return AUTH_MODE === 'enoki' ? enokiAuthClient : demoAuthClient;
 }
 
 type AuthContextValue = {
@@ -26,6 +29,7 @@ type AuthContextValue = {
   error: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  getSigner: () => Promise<Signer>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -96,9 +100,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, [client, session]);
 
+  const getSigner = useCallback(async () => {
+    if (!session) {
+      throw new Error('You are not signed in.');
+    }
+    return client.getSigner(session);
+  }, [client, session]);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ session, isLoading, isAuthenticating, error, signIn, signOut }),
-    [session, isLoading, isAuthenticating, error, signIn, signOut],
+    () => ({ session, isLoading, isAuthenticating, error, signIn, signOut, getSigner }),
+    [session, isLoading, isAuthenticating, error, signIn, signOut, getSigner],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,3 +1,5 @@
+import type { Signer } from '@mysten/sui/cryptography';
+
 export type AuthProviderId = 'demo' | 'google';
 
 export type AuthSession = {
@@ -26,4 +28,6 @@ export interface AuthClient {
   signIn(): Promise<AuthSession>;
   /** Provider-specific cleanup (revoke tokens, etc). Local session clearing is separate. */
   signOut(session: AuthSession): Promise<void>;
+  /** Returns a signer for the session's wallet so the client can submit a transaction. */
+  getSigner(session: AuthSession): Promise<Signer>;
 }
