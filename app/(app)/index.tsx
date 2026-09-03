@@ -1,7 +1,8 @@
-import { Link, Stack, useFocusEffect } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-native';
 
+import { Screen } from '@/components/screen';
 import { useAuth } from '@/lib/auth/auth-context';
 import { apiGet } from '@/lib/sui/api';
 import { fromBaseUnits, SUI_COIN, USDC_COIN } from '@/lib/sui/coins';
@@ -77,13 +78,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-slate-950"
-      contentContainerClassName="gap-5 px-5 py-8"
-      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} />}
-    >
-      <Stack.Screen options={{ title: 'Home', headerShown: false }} />
-
+    <Screen refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor="#94a3b8" />}>
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-xl bg-blue-600">
@@ -91,7 +86,9 @@ export default function HomeScreen() {
           </View>
           <View>
             <Text className="text-lg font-bold tracking-tight text-white">RemitGuard</Text>
-            <Text className="text-[10px] font-medium uppercase tracking-widest text-slate-500">on Sui</Text>
+            <Text className="text-[10px] font-medium uppercase tracking-widest text-slate-500">
+              on Sui
+            </Text>
           </View>
         </View>
         <View className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5">
@@ -99,7 +96,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View className="gap-1 pt-3">
+      <View className="gap-1">
         <Text className="text-sm text-slate-400">Welcome back</Text>
         <Text className="text-2xl font-bold text-white">{session.displayName}</Text>
         {session.email ? <Text className="text-sm text-slate-500">{session.email}</Text> : null}
@@ -108,20 +105,26 @@ export default function HomeScreen() {
       <View className="gap-4 overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 p-5">
         <View className="flex-row items-center justify-between">
           <Text className="text-sm font-medium text-slate-400">Wallet balance</Text>
-          <Text className="text-xs font-medium text-emerald-400">Sui testnet</Text>
+          {balances === null ? (
+            <ActivityIndicator color="#94a3b8" size="small" />
+          ) : (
+            <Text className="text-xs font-medium text-emerald-400">Sui testnet</Text>
+          )}
         </View>
-        {balances === null ? (
-          <ActivityIndicator color="#94a3b8" />
-        ) : (
-          balances.map((row) => (
-            <View key={row.coinType} className="flex-row items-baseline justify-between">
-              <Text className="text-3xl font-bold tracking-tight text-white">
-                {fromBaseUnits(BigInt(row.balance), row.decimals)}
-              </Text>
-              <Text className="text-sm font-medium text-slate-500">{row.symbol}</Text>
+        {[USDC_COIN, SUI_COIN].map((coin) => {
+          const row = balances?.find((entry) => entry.coinType === coin.type);
+          const amount = row
+            ? fromBaseUnits(BigInt(row.balance), row.decimals)
+            : balances === null
+              ? '--'
+              : '0';
+          return (
+            <View key={coin.type} className="flex-row items-baseline justify-between">
+              <Text className="text-3xl font-bold tracking-tight text-white">{amount}</Text>
+              <Text className="text-sm font-medium text-slate-500">{coin.symbol}</Text>
             </View>
-          ))
-        )}
+          );
+        })}
         <Text className="border-t border-slate-800 pt-3 text-xs leading-5 text-slate-500">
           {USDC_COIN.symbol} is what RemitGuard sends. {SUI_COIN.symbol} pays the network fee.
         </Text>
@@ -148,7 +151,10 @@ export default function HomeScreen() {
       </Pressable>
 
       {notice ? (
-        <Text className="rounded-xl border border-blue-400/20 bg-blue-400/10 p-3 text-sm leading-5 text-blue-200" accessibilityLiveRegion="polite">
+        <Text
+          className="rounded-xl border border-blue-400/20 bg-blue-400/10 p-3 text-sm leading-5 text-blue-200"
+          accessibilityLiveRegion="polite"
+        >
           {notice}
         </Text>
       ) : null}
@@ -180,6 +186,6 @@ export default function HomeScreen() {
       >
         <Text className="text-base font-semibold text-slate-300">Sign out</Text>
       </Pressable>
-    </ScrollView>
+    </Screen>
   );
 }
