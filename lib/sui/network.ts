@@ -17,7 +17,9 @@ export function explorerTxUrl(digest: string): string {
  */
 export function getApiUrl(): string {
   const configured = process.env.EXPO_PUBLIC_API_URL;
-  if (configured) {
+  const configuredIsLocalhost = configured?.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/);
+
+  if (configured && !(Platform.OS !== 'web' && configuredIsLocalhost)) {
     return configured;
   }
 
@@ -26,9 +28,11 @@ export function getApiUrl(): string {
   }
 
   const host = Constants.expoConfig?.hostUri?.split(':')[0];
-  if (host) {
-    return `http://${host}:3000`;
+
+  // Android emulator: the host machine is 10.0.2.2, not localhost.
+  if (!host || host === 'localhost' || host === '127.0.0.1') {
+    return Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
   }
 
-  return 'http://localhost:3000';
+  return `http://${host}:3000`;
 }
