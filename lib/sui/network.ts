@@ -17,7 +17,9 @@ export function explorerTxUrl(digest: string): string {
  */
 export function getApiUrl(): string {
   const configured = process.env.EXPO_PUBLIC_API_URL;
-  if (configured) {
+  const configuredIsLocalhost = configured?.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/);
+
+  if (configured && !(Platform.OS !== 'web' && configuredIsLocalhost)) {
     return configured;
   }
 
