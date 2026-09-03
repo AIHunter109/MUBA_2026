@@ -147,24 +147,6 @@ export default function HomeScreen() {
         <Text className="text-base font-semibold text-slate-200">Add testnet SUI (gas)</Text>
       </Pressable>
 
-      <View className="gap-3 pt-2">
-        <Text className="text-sm font-semibold text-slate-300">Manage RemitGuard</Text>
-        <View className="flex-row flex-wrap gap-2">
-          {[
-            ['Recipients', './recipients'],
-            ['History', './history'],
-            ['VeriPlan', './veriplan'],
-            ['Settings', './settings'],
-          ].map(([label, href]) => (
-            <Link key={href} href={href as './recipients'} asChild>
-              <Pressable className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-3 active:bg-slate-800">
-                <Text className="text-sm font-semibold text-slate-300">{label}</Text>
-              </Pressable>
-            </Link>
-          ))}
-        </View>
-      </View>
-
       {notice ? (
         <Text className="rounded-xl border border-blue-400/20 bg-blue-400/10 p-3 text-sm leading-5 text-blue-200" accessibilityLiveRegion="polite">
           {notice}
