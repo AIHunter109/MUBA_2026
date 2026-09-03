@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String             @id @default(cuid())
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  identities     AuthIdentity[]
+  recipients     Recipient[]
+  intents        PaymentIntent[]
+  safetyChecks   SafetyCheck[]
+  transactions   Transaction[]
+  recurringRules RecurringRule[]
+  prompts        ReconciliationPrompt[]
+  idempotencyKeys IdempotencyKey[]
+}
+
+model AuthIdentity {
+  id           String   @id @default(cuid())
+  provider     String
+  providerSub  String
+  userId       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSub])
+  @@index([userId])
+}
+
+model Recipient {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  address     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intents     PaymentIntent[]
+  transactions Transaction[]
+  recurringRules RecurringRule[]
+
+  @@unique([userId, name])
+  @@index([userId, address])
+}
+
+model PaymentIntent {
+  id               String   @id @default(cuid())
+  userId           String
+  recipientId      String?
+  instruction      String
+  normalizedIntent Json
+  status           String
+  confirmedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipient        Recipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  safetyChecks     SafetyCheck[]
+  transaction      Transaction?
+
+  @@index([userId, createdAt])
+}
+
+model SafetyCheck {
+  id             String   @id @default(cuid())
+  userId         String
+  paymentIntentId String
+  verdict        String
+  flags          Json
+  parserResult   Json
+  verifierResult Json
+  createdAt      DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentIntent  PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentIntentId])
+}
+
+model Transaction {
+  id              String   @id @default(cuid())
+  userId          String
+  paymentIntentId String?  @unique
+  recipientId     String?
+  amount          Decimal  @db.Decimal(20, 6)
+  asset           String
+  status          String
+  digest          String?  @unique
+  network         String
+  failureReason   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  recipient       Recipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, recipientId, createdAt])
+}
+
+model RecurringRule {
+  id             String   @id @default(cuid())
+  userId         String
+  recipientId    String
+  amount         Decimal  @db.Decimal(20, 6)
+  asset          String
+  monthlyDay     Int
+  timezone       String
+  nextTriggerAt  DateTime
+  status         String
+  note           String?
+  lastTriggeredAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipient      Recipient @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+  prompts        ReconciliationPrompt[]
+
+  @@index([status, nextTriggerAt])
+  @@index([userId, nextTriggerAt])
+}
+
+model ReconciliationPrompt {
+  id             String   @id @default(cuid())
+  userId         String
+  recurringRuleId String
+  matchedAt      DateTime
+  windowStart    DateTime
+  windowEnd      DateTime
+  status         String
+  resolution     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recurringRule  RecurringRule @relation(fields: [recurringRuleId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model IdempotencyKey {
+  id             String   @id @default(cuid())
+  userId         String
+  key            String
+  operation      String
+  response       Json?
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}

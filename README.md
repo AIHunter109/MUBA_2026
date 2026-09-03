@@ -1,5 +1,7 @@
 # Welcome to your Expo app 👋
 
+Project development is tracked in [plan.md](plan.md). Phase 0 integration findings and open decisions are recorded in [docs/phase-0-integration-decisions.md](docs/phase-0-integration-decisions.md).
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
