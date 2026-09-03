@@ -10,9 +10,13 @@ type ScreenProps = {
   keyboardShouldPersistTaps?: 'always' | 'never' | 'handled';
 };
 
+const MAX_CONTENT_WIDTH = 1120;
+
 /**
  * Standard page frame: dark background, horizontal padding, and top padding that
- * clears the status bar / notch. The bottom tab bar handles its own safe area.
+ * clears the status bar / notch. Content is capped and centered so wide web
+ * viewports do not stretch it edge to edge. The bottom tab bar / sidebar handle
+ * their own safe area.
  */
 export function Screen({
   children,
@@ -28,6 +32,9 @@ export function Screen({
     paddingBottom: 44,
     paddingHorizontal: 20,
     gap,
+    width: '100%',
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: 'center',
   } as const;
 
   if (!scroll) {
