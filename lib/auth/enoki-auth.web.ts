@@ -2,7 +2,7 @@ import { EnokiFlow } from '@mysten/enoki';
 import * as WebBrowser from 'expo-web-browser';
 
 import { ENOKI_API_KEY, ENOKI_NETWORK, GOOGLE_CLIENT_ID } from './enoki-config';
-import type { AuthClient, AuthSession as Session } from './types';
+import { AuthCancelledError, type AuthClient, type AuthSession as Session } from './types';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -57,19 +57,26 @@ export const enokiAuthClient: AuthClient = {
       extraParams: { scope: ['email', 'profile'] },
     });
 
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+    let result: Awaited<ReturnType<typeof WebBrowser.openAuthSessionAsync>>;
+    try {
+      result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+    } catch {
+      // Popup blocked or closed before it could report a result.
+      throw new AuthCancelledError();
+    }
 
     if (result.type === 'cancel' || result.type === 'dismiss') {
-      throw new Error('Sign-in was cancelled.');
+      throw new AuthCancelledError();
     }
     if (result.type !== 'success' || !result.url) {
-      throw new Error('Sign-in did not complete.');
+      throw new AuthCancelledError();
     }
 
     const hashIndex = result.url.indexOf('#');
     const hash = hashIndex >= 0 ? result.url.slice(hashIndex + 1) : '';
     if (!hash) {
-      throw new Error('Google did not return an ID token.');
+      // Reached the redirect with no token (e.g. user denied the consent screen).
+      throw new AuthCancelledError();
     }
 
     await flow.handleAuthCallback(hash);

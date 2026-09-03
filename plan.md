@@ -43,7 +43,19 @@ Initial settlement foundation completed: Expo auth dependencies, native/web sess
 
 Auth shell now runs in Expo Go: `AuthProvider` context, `Stack.Protected` route guards, an `(app)` authenticated group, a working sign-in screen, and persisted sessions (SecureStore native, sessionStorage web). `@mysten/dapp-kit` / `registerEnokiWallets` were removed from the native path because they are browser-only.
 
-Transfer vertical slice (step 14) is live, client-side: Home shows real testnet balances (USDC + SUI) with pull-to-refresh and a testnet-SUI faucet button; `app/(app)/send.tsx` builds a PTB with `coinWithBalance`, signs with the session signer (`AuthClient.getSigner`), submits via `SuiJsonRpcClient`, waits for finality, and shows digest + Suiscan link. `lib/sui/` holds `sui-client.ts`, `coins.ts`, `transfer.ts`, `faucet.ts`. Backend confirmation-token flow, Enoki sponsorship (step 15), and persistence/reconcile are still to do.
+Transfer vertical slice (step 14) is live with the backend owning Sui. Every
+client-side Sui transport failed on React Native (JSON-RPC is off on public
+fullnodes; gRPC-web needs a streaming `response.body` Hermes lacks; the GraphQL
+client drags in graphql-js whose ESM crashes Metro). So the server (`SuiGrpcClient`,
+works in Node) exposes `GET /v1/balances`, `POST /v1/transfer/prepare` (builds the
+PTB, returns BCS bytes), and `POST /v1/transfer/execute` (submits signed bytes,
+waits for finality). The client signs the prepared bytes locally with
+`AuthClient.getSigner` and never builds or submits. `lib/sui/` is now `api.ts`,
+`coins.ts`, `transfer.ts`, `faucet.ts`, `network.ts` (no Sui client). `getApiUrl()`
+auto-derives the dev machine's LAN host from `Constants.expoConfig.hostUri` so a
+physical phone reaches the server. Requires `npm run server` running. Backend
+confirmation-token/auth, Enoki sponsorship (step 15), and persistence/reconcile
+are still to do.
 
 Two `AuthClient` implementations sit behind `resolveAuthClient()` in `lib/auth/auth-context.tsx`:
 - `lib/auth/demo-auth.ts`: generates a local Ed25519 keypair (`expo-crypto`) and derives a real Sui testnet address. No network, no Google. Used on native and whenever `EXPO_PUBLIC_DEMO_MODE=true`.

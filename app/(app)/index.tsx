@@ -3,45 +3,26 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { useAuth } from '@/lib/auth/auth-context';
-import { fromBaseUnits, SUI_COIN, SUPPORTED_COINS, USDC_COIN } from '@/lib/sui/coins';
+import { apiGet } from '@/lib/sui/api';
+import { fromBaseUnits, SUI_COIN, USDC_COIN } from '@/lib/sui/coins';
 import { requestTestnetSui } from '@/lib/sui/faucet';
-import { getSuiClient } from '@/lib/sui/sui-client';
 
 function shortAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-type Balances = Record<string, bigint>;
+type BalanceRow = { coinType: string; symbol: string; decimals: number; balance: string };
 
-async function fetchBalances(address: string): Promise<Balances> {
-  const client = getSuiClient();
-  const results = await Promise.allSettled(
-    SUPPORTED_COINS.map((coin) => client.core.getBalance({ owner: address, coinType: coin.type })),
+async function fetchBalances(address: string): Promise<BalanceRow[]> {
+  const { balances } = await apiGet<{ balances: BalanceRow[] }>(
+    `/v1/balances?owner=${encodeURIComponent(address)}`,
   );
-
-  const balances: Balances = {};
-  let failures = 0;
-  results.forEach((result, index) => {
-    const coinType = SUPPORTED_COINS[index].type;
-    if (result.status === 'fulfilled') {
-      balances[coinType] = BigInt(result.value.balance.balance);
-    } else {
-      failures += 1;
-      balances[coinType] = 0n;
-    }
-  });
-
-  if (failures === SUPPORTED_COINS.length) {
-    const first = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-    throw first?.reason instanceof Error ? first.reason : new Error('Balance lookup failed.');
-  }
-
   return balances;
 }
 
 export default function HomeScreen() {
   const { session, signOut } = useAuth();
-  const [balances, setBalances] = useState<Balances | null>(null);
+  const [balances, setBalances] = useState<BalanceRow[] | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [faucetBusy, setFaucetBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -57,7 +38,7 @@ export default function HomeScreen() {
       setBalances(await fetchBalances(address));
       setNotice(null);
     } catch (error) {
-      setBalances((current) => current ?? {});
+      setBalances((current) => current ?? []);
       setNotice(
         error instanceof Error
           ? `Could not load balances: ${error.message}`
@@ -129,17 +110,17 @@ export default function HomeScreen() {
           <Text className="text-sm font-medium text-slate-400">Wallet balance</Text>
           <Text className="text-xs font-medium text-emerald-400">Sui testnet</Text>
         </View>
-        {balances ? (
-          SUPPORTED_COINS.map((coin) => (
-            <View key={coin.type} className="flex-row items-baseline justify-between">
+        {balances === null ? (
+          <ActivityIndicator color="#94a3b8" />
+        ) : (
+          balances.map((row) => (
+            <View key={row.coinType} className="flex-row items-baseline justify-between">
               <Text className="text-3xl font-bold tracking-tight text-white">
-                {fromBaseUnits(balances[coin.type] ?? 0n, coin.decimals)}
+                {fromBaseUnits(BigInt(row.balance), row.decimals)}
               </Text>
-              <Text className="text-sm font-semibold text-slate-400">{coin.symbol}</Text>
+              <Text className="text-sm font-medium text-slate-500">{row.symbol}</Text>
             </View>
           ))
-        ) : (
-          <ActivityIndicator />
         )}
         <Text className="border-t border-slate-800 pt-3 text-xs leading-5 text-slate-500">
           {USDC_COIN.symbol} is what RemitGuard sends. {SUI_COIN.symbol} pays the network fee.
@@ -165,24 +146,6 @@ export default function HomeScreen() {
         {faucetBusy ? <ActivityIndicator /> : null}
         <Text className="text-base font-semibold text-slate-200">Add testnet SUI (gas)</Text>
       </Pressable>
-
-      <View className="gap-3 pt-2">
-        <Text className="text-sm font-semibold text-slate-300">Manage RemitGuard</Text>
-        <View className="flex-row flex-wrap gap-2">
-          {[
-            ['Recipients', './recipients'],
-            ['History', './history'],
-            ['VeriPlan', './veriplan'],
-            ['Settings', './settings'],
-          ].map(([label, href]) => (
-            <Link key={href} href={href as './recipients'} asChild>
-              <Pressable className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-3 active:bg-slate-800">
-                <Text className="text-sm font-semibold text-slate-300">{label}</Text>
-              </Pressable>
-            </Link>
-          ))}
-        </View>
-      </View>
 
       {notice ? (
         <Text className="rounded-xl border border-blue-400/20 bg-blue-400/10 p-3 text-sm leading-5 text-blue-200" accessibilityLiveRegion="polite">
