@@ -1,6 +1,7 @@
-import { Stack, useRouter } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
 import type { ReactNode } from 'react';
+import { Pressable, Text, View } from 'react-native';
+
+import { Screen } from '@/components/screen';
 
 export function AppPage({
   title,
@@ -11,34 +12,14 @@ export function AppPage({
   subtitle: string;
   children: ReactNode;
 }) {
-  const router = useRouter();
-
   return (
-    <View className="flex-1 bg-slate-950">
-      <Stack.Screen
-        options={{
-          title,
-          headerShown: true,
-          headerStyle: { backgroundColor: '#020617' },
-          headerTintColor: '#f8fafc',
-          headerTitleStyle: { color: '#f8fafc' },
-        }}
-      />
-      <View className="flex-1 gap-5 px-5 py-8">
-        <View className="gap-1">
-          <Text className="text-3xl font-bold tracking-tight text-white">{title}</Text>
-          <Text className="text-sm leading-5 text-slate-400">{subtitle}</Text>
-        </View>
-        {children}
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(app)'))}
-          className="items-center rounded-xl border border-slate-700 px-5 py-4 active:bg-slate-800"
-        >
-          <Text className="font-semibold text-slate-300">Back to home</Text>
-        </Pressable>
+    <Screen>
+      <View className="gap-1">
+        <Text className="text-3xl font-bold tracking-tight text-white">{title}</Text>
+        <Text className="text-sm leading-5 text-slate-400">{subtitle}</Text>
       </View>
-    </View>
+      {children}
+    </Screen>
   );
 }
 

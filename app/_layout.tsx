@@ -3,6 +3,7 @@ import '@/global.css';
 
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
@@ -37,6 +38,7 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
+      <StatusBar style="light" />
       <RootNavigator />
     </AuthProvider>
   );
