@@ -63,25 +63,33 @@ export default function SendScreen() {
   if (phase === 'done' && outcome) {
     const ok = outcome.status === 'success';
     return (
-      <ScrollView className="flex-1 bg-white" contentContainerClassName="gap-6 px-6 py-10">
-        <Stack.Screen options={{ title: 'Send', headerShown: true }} />
+      <ScrollView className="flex-1 bg-slate-950" contentContainerClassName="gap-6 px-5 py-8">
+        <Stack.Screen
+          options={{
+            title: 'Send',
+            headerShown: true,
+            headerStyle: { backgroundColor: '#020617' },
+            headerTintColor: '#f8fafc',
+            headerTitleStyle: { color: '#f8fafc' },
+          }}
+        />
 
-        <Text className={`text-2xl font-bold ${ok ? 'text-emerald-700' : 'text-red-600'}`}>
+        <Text className={`text-3xl font-bold ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
           {ok ? 'Transfer settled' : 'Transfer failed on chain'}
         </Text>
 
         {ok ? (
-          <Text className="text-base leading-6 text-slate-600">
+          <Text className="text-base leading-6 text-slate-300">
             {amount} {coin.symbol} sent to{'\n'}
             <Text className="font-mono text-sm">{recipient.trim()}</Text>
           </Text>
         ) : (
-          <Text className="text-base leading-6 text-red-600">{outcome.error ?? 'Unknown error.'}</Text>
+          <Text className="text-base leading-6 text-red-400">{outcome.error ?? 'Unknown error.'}</Text>
         )}
 
-        <View className="gap-2 rounded-2xl border border-slate-200 p-5">
-          <Text className="text-sm text-slate-500">Transaction digest</Text>
-          <Text className="font-mono text-xs text-slate-900" selectable>
+        <View className="gap-2 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <Text className="text-sm text-slate-400">Transaction digest</Text>
+          <Text className="font-mono text-xs text-slate-200" selectable>
             {outcome.digest}
           </Text>
           <Pressable
@@ -90,14 +98,14 @@ export default function SendScreen() {
               void Linking.openURL(explorerTxUrl(outcome.digest));
             }}
           >
-            <Text className="text-sm font-semibold text-emerald-700">View on explorer</Text>
+            <Text className="text-sm font-semibold text-emerald-400">View on explorer</Text>
           </Pressable>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          className="items-center rounded-xl bg-emerald-700 px-5 py-4 active:bg-emerald-800"
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(app)'))}
+          className="items-center rounded-xl bg-blue-600 px-5 py-4 active:bg-blue-500"
         >
           <Text className="text-base font-bold text-white">Back to Home</Text>
         </Pressable>
@@ -107,11 +115,19 @@ export default function SendScreen() {
 
   return (
     <ScrollView
-      className="flex-1 bg-white"
-      contentContainerClassName="gap-6 px-6 py-10"
+      className="flex-1 bg-slate-950"
+      contentContainerClassName="gap-6 px-5 py-8"
       keyboardShouldPersistTaps="handled"
     >
-      <Stack.Screen options={{ title: 'Send', headerShown: true }} />
+      <Stack.Screen
+        options={{
+          title: 'Send',
+          headerShown: true,
+          headerStyle: { backgroundColor: '#020617' },
+          headerTintColor: '#f8fafc',
+          headerTitleStyle: { color: '#f8fafc' },
+        }}
+      />
 
       <View className="flex-row gap-2">
         {SUPPORTED_COINS.map((option) => {
@@ -123,10 +139,10 @@ export default function SendScreen() {
               accessibilityState={{ selected: active }}
               onPress={() => setCoin(option)}
               className={`flex-1 items-center rounded-xl border px-4 py-3 ${
-                active ? 'border-emerald-700 bg-emerald-50' : 'border-slate-300'
+                active ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 bg-slate-900/60'
               }`}
             >
-              <Text className={`font-semibold ${active ? 'text-emerald-800' : 'text-slate-700'}`}>
+              <Text className={`font-semibold ${active ? 'text-blue-300' : 'text-slate-300'}`}>
                 {option.symbol}
               </Text>
             </Pressable>
@@ -135,7 +151,7 @@ export default function SendScreen() {
       </View>
 
       <View className="gap-2">
-        <Text className="text-sm font-medium text-slate-700">Recipient Sui address</Text>
+        <Text className="text-sm font-medium text-slate-300">Recipient Sui address</Text>
         <TextInput
           value={recipient}
           onChangeText={setRecipient}
@@ -143,36 +159,36 @@ export default function SendScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           editable={phase === 'form'}
-          className="rounded-xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-900"
+          className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-sm text-slate-100"
         />
         <Pressable
           accessibilityRole="button"
           onPress={() => setRecipient(Ed25519Keypair.generate().toSuiAddress())}
         >
-          <Text className="text-xs font-semibold text-emerald-700">Fill a throwaway test address</Text>
+          <Text className="text-xs font-semibold text-blue-400">Fill a throwaway test address</Text>
         </Pressable>
       </View>
 
       <View className="gap-2">
-        <Text className="text-sm font-medium text-slate-700">Amount ({coin.symbol})</Text>
+        <Text className="text-sm font-medium text-slate-300">Amount ({coin.symbol})</Text>
         <TextInput
           value={amount}
           onChangeText={setAmount}
           placeholder="0.00"
           keyboardType="decimal-pad"
           editable={phase === 'form'}
-          className="rounded-xl border border-slate-300 px-4 py-3 text-lg text-slate-900"
+          className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-lg text-slate-100"
         />
       </View>
 
       {coin.type === SUI_COIN.type ? (
-        <Text className="text-xs leading-5 text-slate-400">
+        <Text className="text-xs leading-5 text-slate-500">
           Sending SUI also spends a little SUI on gas.
         </Text>
       ) : null}
 
       {error ? (
-        <Text className="text-sm leading-5 text-red-600" accessibilityLiveRegion="polite">
+        <Text className="text-sm leading-5 text-red-400" accessibilityLiveRegion="polite">
           {error}
         </Text>
       ) : null}
@@ -182,7 +198,7 @@ export default function SendScreen() {
         accessibilityLabel={`Send ${coin.symbol}`}
         disabled={!canSubmit}
         onPress={onSubmit}
-        className="flex-row items-center justify-center gap-3 rounded-xl bg-emerald-700 px-5 py-4 active:bg-emerald-800 disabled:opacity-50"
+        className="flex-row items-center justify-center gap-3 rounded-xl bg-blue-600 px-5 py-4 active:bg-blue-500 disabled:opacity-50"
       >
         {phase === 'submitting' ? <ActivityIndicator color="#ffffff" /> : null}
         <Text className="text-base font-bold text-white">
@@ -190,7 +206,7 @@ export default function SendScreen() {
         </Text>
       </Pressable>
 
-      <Text className="text-xs leading-5 text-slate-400">
+      <Text className="text-xs leading-5 text-slate-500">
         This build signs and submits directly from the app. Backend confirmation, sponsorship, and
         the AI safety review come in later phases.
       </Text>

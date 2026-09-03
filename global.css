@@ -3,3 +3,10 @@
 @import "tailwindcss/utilities.css";
  
 @import "nativewind/theme";
+
+@layer base {
+  body {
+    background-color: #020617;
+    color: #f1f5f9;
+  }
+}
