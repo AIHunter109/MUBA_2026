@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, type ScrollViewProps, View } from 'react-native';
+import { ScrollView, type ScrollViewProps, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ScreenProps = {
@@ -26,13 +26,16 @@ export function Screen({
   keyboardShouldPersistTaps,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const horizontalPadding = width < 360 ? 14 : width >= 768 ? 28 : 20;
 
   const containerStyle = {
     paddingTop: insets.top + 12,
-    paddingBottom: 44,
-    paddingHorizontal: 20,
+    paddingBottom: Math.max(insets.bottom + 16, 44),
+    paddingHorizontal: horizontalPadding,
     gap,
     width: '100%',
+    minWidth: 0,
     maxWidth: MAX_CONTENT_WIDTH,
     alignSelf: 'center',
   } as const;

@@ -13,6 +13,8 @@ type NavItem = {
   icon: IconName;
 };
 
+const SIDEBAR_MIN_WIDTH = 1024;
+const BOTTOM_LABEL_MIN_WIDTH = 480;
 
 function isActive(pathname: string, href: NavItem['href']): boolean {
   const path = href.replace('/(app)', '') || '/';
@@ -24,13 +26,16 @@ function isActive(pathname: string, href: NavItem['href']): boolean {
 
 function NavLink({ item, variant }: { item: NavItem; variant: 'side' | 'bottom' }) {
   const pathname = usePathname();
+  const { width } = useWindowDimensions();
   const active = isActive(pathname, item.href);
   const color = active ? '#60a5fa' : '#94a3b8';
+  const showLabel = variant === 'side' || width >= BOTTOM_LABEL_MIN_WIDTH;
 
   return (
     <Link href={item.href} asChild>
       <Pressable
         accessibilityRole="link"
+        accessibilityLabel={item.label}
         accessibilityState={{ selected: active }}
         className={
           variant === 'side'
@@ -39,15 +44,18 @@ function NavLink({ item, variant }: { item: NavItem; variant: 'side' | 'bottom' 
         }
       >
         <Ionicons name={item.icon} size={variant === 'side' ? 20 : 22} color={color} />
-        <Text
-          className={
-            variant === 'side'
-              ? `text-sm font-medium ${active ? 'text-blue-300' : 'text-slate-400'}`
-              : `text-[10px] font-medium ${active ? 'text-blue-300' : 'text-slate-500'}`
-          }
-        >
-          {item.label}
-        </Text>
+        {showLabel ? (
+          <Text
+            className={
+              variant === 'side'
+                ? `text-sm font-medium ${active ? 'text-blue-300' : 'text-slate-400'}`
+                : `text-[10px] font-medium ${active ? 'text-blue-300' : 'text-slate-500'}`
+            }
+            numberOfLines={1}
+          >
+            {item.label}
+          </Text>
+        ) : null}
       </Pressable>
     </Link>
   );
@@ -83,7 +91,7 @@ export default function AppLayoutWeb() {
     return <Redirect href="/sign-in" />;
   }
 
-  if (width >= 768) {
+  if (width >= SIDEBAR_MIN_WIDTH) {
     return (
       <View className="flex-1 flex-row bg-slate-950">
         <View className="w-64 border-r border-slate-800 bg-slate-950 px-3 py-6">

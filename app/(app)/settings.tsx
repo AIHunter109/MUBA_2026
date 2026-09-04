@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { AppPage, PlaceholderCard } from '@/components/app-page';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -10,6 +10,8 @@ import { requestTestnetSui } from '@/lib/sui/faucet';
 export default function SettingsScreen() {
   const { session } = useAuth();
   const { language, setLanguage, t } = useI18n();
+  const { height } = useWindowDimensions();
+  const languageListHeight = Math.min(224, Math.max(128, height * 0.26));
   const [isRequesting, setIsRequesting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -70,13 +72,14 @@ export default function SettingsScreen() {
           <ScrollView
             nestedScrollEnabled
             showsVerticalScrollIndicator
-            className="max-h-56 rounded-xl border border-slate-800 bg-slate-950/40"
-            contentContainerStyle={{ gap: 8, padding: 8, width: '100%' }}
+            style={{ maxHeight: languageListHeight, width: '100%' }}
+            className="rounded-xl border border-slate-800 bg-slate-950/40"
+            contentContainerStyle={{ gap: 8, padding: 8 }}
           >
             {LANGUAGES.map((option) => {
               const selected = language === option.code;
               return (
-                <Pressable key={option.code} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => void setLanguage(option.code)} style={{ alignSelf: 'stretch', width: '100%' }} className={`rounded-lg border px-3 py-3 ${selected ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 bg-slate-900/60'}`}>
+                <Pressable key={option.code} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => void setLanguage(option.code)} style={{ alignSelf: 'stretch' }} className={`rounded-lg border px-3 py-3 ${selected ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 bg-slate-900/60'}`}>
                   <Text className={`text-left text-sm font-semibold ${selected ? 'text-blue-300' : 'text-slate-300'}`}>{option.label}</Text>
                 </Pressable>
               );

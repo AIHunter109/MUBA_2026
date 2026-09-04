@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -26,6 +26,7 @@ export default function HomeScreen() {
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { width } = useWindowDimensions();
 
   const address = session?.walletAddress;
 
@@ -71,6 +72,8 @@ export default function HomeScreen() {
   const usdcBalance = displayBalances.find((row) => row.symbol === USDC_COIN.symbol);
   const suiBalance = displayBalances.find((row) => row.symbol === SUI_COIN.symbol);
   const monthTransactions = transactions.filter((item) => isInCurrentMonth(item.occurredAt));
+  const isNarrow = width < 380;
+  const hasTwoColumnSpace = width >= 1080;
 
   return (
     <Screen
@@ -78,7 +81,10 @@ export default function HomeScreen() {
         <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor="#94a3b8" />
       }
     >
-      <View className="flex-row items-center justify-between">
+      <View
+        className="justify-between"
+        style={{ flexDirection: isNarrow ? 'column' : 'row', alignItems: isNarrow ? 'flex-start' : 'center', gap: isNarrow ? 12 : 0 }}
+      >
         <View className="flex-row items-center gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-xl bg-blue-600">
             <Text className="text-lg font-bold text-white">R</Text>
@@ -100,7 +106,7 @@ export default function HomeScreen() {
         <Text className="text-xs font-semibold uppercase tracking-widest text-blue-300">
           {t('remittanceDesk')}
         </Text>
-        <Text className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+        <Text className="font-bold tracking-tight text-white" style={{ fontSize: isNarrow ? 23 : 28 }}>
           {t('goodToSee', { name: session.displayName.split(' ')[0] })}
         </Text>
         <Text className="max-w-xl text-sm leading-5 text-slate-400">
@@ -108,9 +114,9 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      <View className="gap-4 md:flex-row md:items-stretch">
-        <View className="w-full gap-4 rounded-3xl border border-blue-400/20 bg-slate-900 p-5 md:flex-1 md:p-6">
-          <View className="flex-row items-center justify-between">
+      <View className="gap-4" style={{ flexDirection: hasTwoColumnSpace ? 'row' : 'column', alignItems: 'stretch' }}>
+        <View className="w-full gap-4 rounded-3xl border border-blue-400/20 bg-slate-900 p-5" style={{ flex: hasTwoColumnSpace ? 1 : undefined }}>
+          <View className="justify-between" style={{ flexDirection: isNarrow ? 'column' : 'row', alignItems: isNarrow ? 'flex-start' : 'center', gap: isNarrow ? 10 : 0 }}>
             <View>
               <Text className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                 {t('availableBalance')}
@@ -155,9 +161,9 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <View className="flex-row gap-2 pt-1">
+          <View className="gap-2 pt-1" style={{ flexDirection: isNarrow ? 'column' : 'row' }}>
             <Link href="/(app)/send" asChild>
-              <Pressable className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 active:bg-blue-500">
+              <Pressable className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 active:bg-blue-500" style={{ flex: isNarrow ? undefined : 1 }}>
                 <Ionicons name="arrow-up-outline" size={18} color="#ffffff" />
                 <Text className="font-bold text-white">{t('sendMoney')}</Text>
               </Pressable>
@@ -165,7 +171,8 @@ export default function HomeScreen() {
             <Pressable
               accessibilityRole="button"
               onPress={() => Alert.alert('Receive USDC', session.walletAddress)}
-              className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-3 active:bg-slate-800"
+              className="flex-row items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-3 active:bg-slate-800"
+              style={{ flex: isNarrow ? undefined : 1 }}
             >
               <Ionicons name="arrow-down-outline" size={18} color="#94a3b8" />
               <Text className="font-semibold text-slate-200">{t('receive')}</Text>
@@ -173,7 +180,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View className="w-full gap-3 rounded-3xl border border-slate-800 bg-slate-900/70 p-5 md:flex-1 md:p-6">
+        <View className="w-full gap-3 rounded-3xl border border-slate-800 bg-slate-900/70 p-5" style={{ flex: hasTwoColumnSpace ? 1 : undefined }}>
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-2">
               <Ionicons name="receipt-outline" size={20} color="#60a5fa" />
@@ -186,7 +193,7 @@ export default function HomeScreen() {
           {transactions.length ? (
             <View className="gap-3">
               {transactions.slice(0, 3).map((transaction) => (
-                <TransactionRow key={transaction.digest} transaction={transaction} />
+                <TransactionRow key={transaction.digest} transaction={transaction} compact={isNarrow} />
               ))}
             </View>
           ) : (
@@ -267,16 +274,16 @@ function shortAddress(address: string): string {
   return `${address.slice(0, 7)}...${address.slice(-4)}`;
 }
 
-function TransactionRow({ transaction }: { transaction: TransactionRecord }) {
+function TransactionRow({ transaction, compact }: { transaction: TransactionRecord; compact: boolean }) {
   return (
-    <View className="flex-row items-center justify-between border-b border-slate-800 pb-3 last:border-b-0 last:pb-0">
+    <View className="justify-between border-b border-slate-800 pb-3 last:border-b-0 last:pb-0" style={{ flexDirection: compact ? 'column' : 'row', alignItems: compact ? 'flex-start' : 'center', gap: compact ? 4 : 0 }}>
       <View className="min-w-0 flex-1 gap-0.5 pr-3">
-        <Text className="text-sm font-semibold text-slate-200">Sent to {shortAddress(transaction.recipient)}</Text>
+        <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>Sent to {shortAddress(transaction.recipient)}</Text>
         <Text className="text-xs text-slate-500">
           {new Date(transaction.occurredAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
         </Text>
       </View>
-      <Text className="text-sm font-bold text-white">
+      <Text className="text-sm font-bold text-white" numberOfLines={1}>
         −{fromBaseUnits(BigInt(transaction.amountBaseUnits), transaction.decimals)} {transaction.symbol}
       </Text>
     </View>
