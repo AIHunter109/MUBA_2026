@@ -2,6 +2,19 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
 
+# Platforms: iOS, Android, and web are all first-class
+
+The app must run and work **properly** on iPhone, Android, and a desktop web browser. This is not "native app with a web fallback": all three are shipping targets and all three are demoed. A change that only works on one platform is not finished.
+
+- **The UI adapts to each platform** and uses the pattern that is idiomatic there:
+  - iOS / Android: a real native bottom tab bar via Expo Router `NativeTabs` (`app/(app)/_layout.tsx`), so it picks up the system tab bar (Liquid Glass on iOS 26, the standard translucent bar otherwise) and SF Symbols on iOS.
+  - Web, wide viewport (laptop/desktop): a left sidebar.
+  - Web, narrow viewport (resized or mobile browser): a bottom bar.
+  - The native and web shells are split with `_layout.tsx` / `_layout.web.tsx`.
+- **Respect device safe areas**: the status bar / notch at the top, and the home indicator plus the translucent tab bar at the bottom. Every screen pads its content clear of them (see `components/screen.tsx`).
+- **Platform-specific auth/wallet behavior is expected** (e.g. real Google zkLogin runs on web today; native uses a local demo wallet until a dev build exists). Build these as explicit per-platform adapters behind one shared interface. Never assume parity, never let one platform silently break.
+- **Verify every change on all three** before calling it done: iPhone (Expo Go or a dev build), an Android device or emulator, and a browser at both wide and narrow widths.
+
 # RemitGuard AI — Project Brief
 
 **Purpose of this document:** This is a complete project context brief for RemitGuard AI, written to be handed to an LLM (e.g. a coding assistant) as background before building. It consolidates the problem, solution, architecture, tech stack, scope boundaries, and build order.
