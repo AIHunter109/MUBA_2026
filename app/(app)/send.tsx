@@ -42,7 +42,7 @@ export default function SendScreen() {
     try {
       amountBaseUnits = toBaseUnits(amount, coin.decimals);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid amount.');
+      setError(err instanceof Error ? err.message : t('invalidAmount'));
       return;
     }
 
@@ -75,10 +75,10 @@ export default function SendScreen() {
       setOutcome(result);
       setPhase('done');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'The transfer failed.');
+      setError(err instanceof Error ? err.message : t('transferFailedMessage'));
       setPhase('form');
     }
-  }, [amount, coin, getSigner, recipient]);
+  }, [amount, coin, getSigner, recipient, t]);
 
   if (phase === 'done' && outcome) {
     const ok = outcome.status === 'success';
@@ -94,7 +94,7 @@ export default function SendScreen() {
             <Text className="font-mono text-sm">{recipient.trim()}</Text>
           </Text>
         ) : (
-          <Text className="text-base leading-6 text-red-400">{outcome.error ?? 'Unknown error.'}</Text>
+          <Text className="text-base leading-6 text-red-400">{outcome.error ?? t('unknownError')}</Text>
         )}
 
         <View className="gap-2 rounded-2xl border border-slate-800 bg-slate-900 p-5">

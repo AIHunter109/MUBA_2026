@@ -1,4 +1,5 @@
 import { SuiGrpcClient } from '@mysten/sui/grpc';
+import { SuiJsonRpcClient } from '@mysten/sui/jsonRpc';
 import { coinWithBalance, Transaction } from '@mysten/sui/transactions';
 import { fromBase64, isValidSuiAddress, toBase64 } from '@mysten/sui/utils';
 
@@ -30,6 +31,16 @@ export function createSuiClient(environment: Environment): SuiGrpcClient {
 
 export type CoinBalance = { coinType: string; symbol: string; decimals: number; balance: string };
 
+export type ReceivedTransfer = {
+  digest: string;
+  sender: string | null;
+  amountBaseUnits: string;
+  coinType: string;
+  symbol: string;
+  decimals: number;
+  occurredAt: string;
+};
+
 export async function getBalances(
   client: SuiGrpcClient,
   environment: Environment,
@@ -53,6 +64,67 @@ export async function getBalances(
   );
 
   return results;
+}
+
+/**
+ * The gRPC transaction list currently filters by sender only. The testnet JSON-RPC
+ * index exposes the recipient filter we need to surface payments received outside
+ * this app, while all transaction execution continues to use the gRPC client.
+ */
+export async function getReceivedTransfers(
+  environment: Environment,
+  owner: string,
+): Promise<ReceivedTransfer[]> {
+  if (!isValidSuiAddress(owner)) {
+    throw new Error('Invalid Sui address');
+  }
+
+  const rpc = new SuiJsonRpcClient({
+    network: environment.SUI_NETWORK,
+    url: environment.SUI_RPC_URL || DEFAULT_TESTNET_RPC_URL,
+  });
+  const coins = supportedCoins(environment);
+  const coinByType = new Map(coins.map((coin) => [coin.type, coin]));
+  const response = await rpc.queryTransactionBlocks({
+    filter: { ToAddress: owner },
+    options: { showBalanceChanges: true, showInput: true },
+    limit: 50,
+    order: 'descending',
+  });
+
+  return response.data.flatMap((transaction) => {
+    const sender = transaction.transaction?.data.sender ?? null;
+    const occurredAt = transaction.timestampMs
+      ? new Date(Number(transaction.timestampMs)).toISOString()
+      : new Date().toISOString();
+
+    return (transaction.balanceChanges ?? []).flatMap((change) => {
+      const coin = coinByType.get(change.coinType);
+      if (!coin || BigInt(change.amount) <= 0n || !isAddressOwner(change.owner, owner)) {
+        return [];
+      }
+
+      return [{
+        digest: transaction.digest,
+        sender,
+        amountBaseUnits: change.amount,
+        coinType: coin.type,
+        symbol: coin.symbol,
+        decimals: coin.decimals,
+        occurredAt,
+      }];
+    });
+  });
+}
+
+function isAddressOwner(owner: unknown, address: string): boolean {
+  return (
+    typeof owner === 'object' &&
+    owner !== null &&
+    'AddressOwner' in owner &&
+    typeof owner.AddressOwner === 'string' &&
+    owner.AddressOwner.toLowerCase() === address.toLowerCase()
+  );
 }
 
 export type PrepareTransferInput = {

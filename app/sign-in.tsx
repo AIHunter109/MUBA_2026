@@ -11,7 +11,7 @@ export default function SignInScreen() {
 
   return (
     <View className="flex-1 justify-center gap-8 bg-slate-950 px-5">
-      <Stack.Screen options={{ title: 'Sign in', headerShown: false }} />
+      <Stack.Screen options={{ title: t('signIn'), headerShown: false }} />
 
       <View className="gap-4">
         <View className="h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-500/25">
@@ -26,7 +26,7 @@ export default function SignInScreen() {
       <View className="gap-4">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Continue with Google"
+          accessibilityLabel={t('continueGoogle')}
           disabled={isAuthenticating}
           onPress={() => {
             void signIn();
@@ -52,8 +52,8 @@ export default function SignInScreen() {
           <Text className="font-semibold text-amber-200">{t('demoMode')}</Text>
           <Text className="mt-1 text-sm leading-5 text-amber-300">
             {isEnokiConfigured && Platform.OS !== 'web'
-              ? 'Real Google zkLogin runs on web for now. On this device, sign-in creates a local testnet wallet with no Google account.'
-              : 'Enoki is not configured, so sign-in creates a local testnet wallet with no Google account.'}
+              ? t('realGoogleDemo')
+              : t('enokiNotConfigured')}
           </Text>
         </View>
       ) : null}

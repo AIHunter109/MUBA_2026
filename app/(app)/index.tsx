@@ -43,12 +43,12 @@ export default function HomeScreen() {
       setBalanceError(null);
     } catch (error) {
       setBalanceError(
-        error instanceof Error ? error.message : 'Could not load balances. Pull to retry.',
+        error instanceof Error ? error.message : t('balanceLoadError'),
       );
     } finally {
       setIsRefreshing(false);
     }
-  }, [address]);
+  }, [address, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -124,7 +124,7 @@ export default function HomeScreen() {
               <Text className="mt-1 text-sm text-slate-400">{t('balanceDescription')}</Text>
             </View>
             <View className="rounded-full bg-blue-400/10 px-3 py-1.5">
-              <Text className="text-xs font-semibold text-blue-300">Sui testnet</Text>
+              <Text className="text-xs font-semibold text-blue-300">{t('suiTestnet')}</Text>
             </View>
           </View>
 
@@ -170,7 +170,7 @@ export default function HomeScreen() {
             </Link>
             <Pressable
               accessibilityRole="button"
-              onPress={() => Alert.alert('Receive USDC', session.walletAddress)}
+              onPress={() => Alert.alert(t('receiveUsdc'), session.walletAddress)}
               className="flex-row items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-3 active:bg-slate-800"
               style={{ flex: isNarrow ? undefined : 1 }}
             >
@@ -244,8 +244,7 @@ export default function HomeScreen() {
       {session.isDemo ? (
         <View className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
           <Text className="text-sm leading-5 text-amber-200">
-            Demo session. This wallet was generated locally on this device and is not linked to a
-            Google account.
+            {t('demoSessionNotice')}
           </Text>
         </View>
       ) : null}
@@ -275,12 +274,13 @@ function shortAddress(address: string): string {
 }
 
 function TransactionRow({ transaction, compact }: { transaction: TransactionRecord; compact: boolean }) {
+  const { language, t } = useI18n();
   return (
     <View className="justify-between border-b border-slate-800 pb-3 last:border-b-0 last:pb-0" style={{ flexDirection: compact ? 'column' : 'row', alignItems: compact ? 'flex-start' : 'center', gap: compact ? 4 : 0 }}>
       <View className="min-w-0 flex-1 gap-0.5 pr-3">
-        <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>Sent to {shortAddress(transaction.recipient)}</Text>
+        <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>{t('sentToRecipient', { recipient: shortAddress(transaction.recipient) })}</Text>
         <Text className="text-xs text-slate-500">
-          {new Date(transaction.occurredAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          {new Date(transaction.occurredAt).toLocaleDateString(language, { month: 'short', day: 'numeric' })}
         </Text>
       </View>
       <Text className="text-sm font-bold text-white" numberOfLines={1}>
@@ -313,6 +313,7 @@ function BalanceTile({
 }
 
 function MonthlySpendChart({ transactions, t }: { transactions: TransactionRecord[]; t: (key: string) => string }) {
+  const { language } = useI18n();
   const usdcTransactions = transactions.filter((item) => item.symbol === 'USDC');
   const totalUsdc = usdcTransactions.reduce(
     (sum, item) => sum + Number(fromBaseUnits(BigInt(item.amountBaseUnits), item.decimals)),
@@ -325,7 +326,7 @@ function MonthlySpendChart({ transactions, t }: { transactions: TransactionRecor
     const total = usdcTransactions
       .filter((item) => new Date(item.occurredAt).toDateString() === date.toDateString())
       .reduce((sum, item) => sum + Number(fromBaseUnits(BigInt(item.amountBaseUnits), item.decimals)), 0);
-    return { label: date.toLocaleDateString(undefined, { weekday: 'narrow' }), total };
+    return { label: date.toLocaleDateString(language, { weekday: 'narrow' }), total };
   });
   const max = Math.max(...days.map((day) => day.total), 1);
 

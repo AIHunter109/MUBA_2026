@@ -7,6 +7,7 @@ import {
   createSuiClient,
   executeSignedTransfer,
   getBalances,
+  getReceivedTransfers,
   prepareTransfer,
   supportedCoins,
 } from './sui';
@@ -94,6 +95,22 @@ const server = createServer((request, response) => {
             : 'The RemitGuard API is running, but it cannot reach Sui testnet. Check your internet/firewall or configure SUI_RPC_URL.',
           requestId,
         );
+      });
+    return;
+  }
+
+  if (method === 'GET' && path === '/v1/transactions') {
+    const owner = new URL(request.url || '/', 'http://localhost').searchParams.get('owner');
+    if (!owner) {
+      writeApiError(response, 400, 'OWNER_REQUIRED', 'An owner address is required', requestId);
+      return;
+    }
+
+    getReceivedTransfers(environment, owner)
+      .then((transactions) => writeJson(response, 200, { owner, transactions }, requestId))
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unable to read transactions';
+        writeApiError(response, message === 'Invalid Sui address' ? 400 : 502, 'TRANSACTION_HISTORY_UNAVAILABLE', message, requestId);
       });
     return;
   }

@@ -23,16 +23,16 @@ export default function SettingsScreen() {
     setNotice(null);
     try {
       await requestTestnetSui(session.walletAddress);
-      setNotice('Testnet SUI requested. It should arrive in a few seconds.');
+      setNotice(t('testnetSuiRequested'));
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Faucet request failed.');
+      setNotice(error instanceof Error ? error.message : t('faucetRequestFailed'));
     } finally {
       setIsRequesting(false);
     }
-  }, [session?.walletAddress]);
+  }, [session?.walletAddress, t]);
 
   return (
-    <AppPage title={t('settings')} subtitle="Configure approval safeguards and account preferences.">
+    <AppPage title={t('settings')} subtitle={t('settingsSubtitle')}>
       <View className="gap-3">
         <View className="gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
           <View className="flex-row items-center gap-2">
@@ -88,23 +88,22 @@ export default function SettingsScreen() {
         </View>
 
         <PlaceholderCard
-          title="VeriPlan"
-          detail="Plan your budget before setting up recurring remittances. Describe your income, essential expenses, savings target, and family support, and budget analysis will help explain payment affordability."
-          action="Create a plan"
+          title={t('veriplan')}
+          detail={t('veriplanDetail')}
+          action={t('createPlan')}
         />
         <PlaceholderCard
-          title="Guardians"
-          detail="Trusted people who can provide a second approval for high-value or high-risk payments."
-          action="Add guardian"
+          title={t('guardians')}
+          detail={t('guardiansDetail')}
+          action={t('addGuardian')}
         />
         <PlaceholderCard
-          title="Payment policies"
-          detail="Set thresholds and rules for new recipients, changed wallets, and second-person approval."
-          action="Add policy"
+          title={t('paymentPolicies')}
+          detail={t('paymentPoliciesDetail')}
+          action={t('addPolicy')}
         />
         <Text className="text-xs leading-5 text-slate-500">
-          VeriPlan, guardians, and payment policies are visual placeholders. Their connected
-          workflows will be available in later phases.
+          {t('settingsPlaceholderNote')}
         </Text>
       </View>
     </AppPage>
