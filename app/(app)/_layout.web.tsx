@@ -3,6 +3,7 @@ import { Link, Redirect, Slot, usePathname } from 'expo-router';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 import { useAuth } from '@/lib/auth/auth-context';
+import { useI18n } from '@/lib/i18n/i18n-context';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -12,13 +13,8 @@ type NavItem = {
   icon: IconName;
 };
 
-const NAV: NavItem[] = [
-  { label: 'Home', href: '/(app)', icon: 'home-outline' },
-  { label: 'Send', href: '/(app)/send', icon: 'paper-plane-outline' },
-  { label: 'Recipients', href: '/(app)/recipients', icon: 'people-outline' },
-  { label: 'History', href: '/(app)/history', icon: 'receipt-outline' },
-  { label: 'Settings', href: '/(app)/settings', icon: 'settings-outline' },
-];
+const SIDEBAR_MIN_WIDTH = 1024;
+const BOTTOM_LABEL_MIN_WIDTH = 480;
 
 function isActive(pathname: string, href: NavItem['href']): boolean {
   const path = href.replace('/(app)', '') || '/';
@@ -30,13 +26,16 @@ function isActive(pathname: string, href: NavItem['href']): boolean {
 
 function NavLink({ item, variant }: { item: NavItem; variant: 'side' | 'bottom' }) {
   const pathname = usePathname();
+  const { width } = useWindowDimensions();
   const active = isActive(pathname, item.href);
   const color = active ? '#60a5fa' : '#94a3b8';
+  const showLabel = variant === 'side' || width >= BOTTOM_LABEL_MIN_WIDTH;
 
   return (
     <Link href={item.href} asChild>
       <Pressable
         accessibilityRole="link"
+        accessibilityLabel={item.label}
         accessibilityState={{ selected: active }}
         className={
           variant === 'side'
@@ -45,15 +44,18 @@ function NavLink({ item, variant }: { item: NavItem; variant: 'side' | 'bottom' 
         }
       >
         <Ionicons name={item.icon} size={variant === 'side' ? 20 : 22} color={color} />
-        <Text
-          className={
-            variant === 'side'
-              ? `text-sm font-medium ${active ? 'text-blue-300' : 'text-slate-400'}`
-              : `text-[10px] font-medium ${active ? 'text-blue-300' : 'text-slate-500'}`
-          }
-        >
-          {item.label}
-        </Text>
+        {showLabel ? (
+          <Text
+            className={
+              variant === 'side'
+                ? `text-sm font-medium ${active ? 'text-blue-300' : 'text-slate-400'}`
+                : `text-[10px] font-medium ${active ? 'text-blue-300' : 'text-slate-500'}`
+            }
+            numberOfLines={1}
+          >
+            {item.label}
+          </Text>
+        ) : null}
       </Pressable>
     </Link>
   );
@@ -75,7 +77,11 @@ function Brand() {
 
 export default function AppLayoutWeb() {
   const { session, isLoading } = useAuth();
+  const { t } = useI18n();
   const { width } = useWindowDimensions();
+  const nav: NavItem[] = [
+    { label: t('home'), href: '/(app)', icon: 'home-outline' }, { label: t('send'), href: '/(app)/send', icon: 'paper-plane-outline' }, { label: t('recipients'), href: '/(app)/recipients', icon: 'people-outline' }, { label: t('history'), href: '/(app)/history', icon: 'receipt-outline' }, { label: t('settings'), href: '/(app)/settings', icon: 'settings-outline' },
+  ];
 
   if (isLoading) {
     return null;
@@ -85,20 +91,20 @@ export default function AppLayoutWeb() {
     return <Redirect href="/sign-in" />;
   }
 
-  if (width >= 768) {
+  if (width >= SIDEBAR_MIN_WIDTH) {
     return (
       <View className="flex-1 flex-row bg-slate-950">
         <View className="w-64 border-r border-slate-800 bg-slate-950 px-3 py-6">
           <Brand />
           <View className="gap-1">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <NavLink key={item.href} item={item} variant="side" />
             ))}
           </View>
           <View className="mt-auto rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
-            <Text className="text-xs font-semibold text-emerald-300">Safety layer active</Text>
+            <Text className="text-xs font-semibold text-emerald-300">{t('safetyActive')}</Text>
             <Text className="mt-1 text-xs leading-5 text-slate-400">
-              Review every transfer before money moves.
+              {t('reviewEveryTransfer')}
             </Text>
           </View>
         </View>
@@ -115,7 +121,7 @@ export default function AppLayoutWeb() {
         <Slot />
       </View>
       <View className="flex-row items-stretch gap-1 border-t border-slate-800 bg-slate-950 px-1.5 pb-2 pt-1.5">
-        {NAV.map((item) => (
+        {nav.map((item) => (
           <NavLink key={item.href} item={item} variant="bottom" />
         ))}
       </View>

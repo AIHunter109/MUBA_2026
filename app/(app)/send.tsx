@@ -14,8 +14,10 @@ import {
   type TransferOutcome,
 } from '@/lib/intent/client';
 import { type Recipient, useRecipients } from '@/lib/recipients/use-recipients';
+import { SUPPORTED_COINS, toBaseUnits, USDC_COIN } from '@/lib/sui/coins';
 import { apiPost } from '@/lib/sui/api';
 import { explorerTxUrl } from '@/lib/sui/network';
+import { saveSettledTransaction } from '@/lib/transactions/ledger';
 import type { IntentReview, ResolvedPlan, TransferAsset } from '@/shared/contracts';
 
 type Mode = 'describe' | 'manual';
@@ -119,6 +121,27 @@ export default function SendScreen() {
           address: review.plan.recipientAddress,
         }).catch(() => undefined);
       }
+
+      if (result.status === 'success') {
+        // A local activity-record failure must never turn a settled on-chain payment into a UI failure.
+        try {
+          const coin = SUPPORTED_COINS.find((c) => c.symbol === review.plan?.asset) ?? USDC_COIN;
+          await saveSettledTransaction({
+            id: result.digest,
+            digest: result.digest,
+            recipient: review.plan.recipientAddress,
+            amountBaseUnits: toBaseUnits(String(review.plan.amount), coin.decimals).toString(),
+            coinType: coin.type,
+            symbol: coin.symbol,
+            decimals: coin.decimals,
+            occurredAt: new Date().toISOString(),
+            status: 'success',
+          });
+        } catch {
+          // The on-chain receipt remains the source of truth on the result screen.
+        }
+      }
+
       setOutcome(result);
       setPhase('done');
     } catch (err) {
