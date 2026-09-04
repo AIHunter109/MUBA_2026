@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const paymentAssetSchema = z.enum(['USDC']);
 export type PaymentAsset = z.infer<typeof paymentAssetSchema>;
 
-export const paymentFrequencySchema = z.enum(['ONE_TIME', 'MONTHLY']);
+export const paymentFrequencySchema = z.enum(['ONE_TIME', 'DAILY', 'MONTHLY']);
 export type PaymentFrequency = z.infer<typeof paymentFrequencySchema>;
 
 export const paymentIntentSchema = z.object({
@@ -42,7 +42,7 @@ export const parsedIntentSchema = z.object({
   recipientLabel: z.string().max(40).nullable(),
   amount: z.number().positive().nullable(),
   asset: transferAssetSchema.nullable(),
-  frequency: z.enum(['ONE_TIME', 'MONTHLY']).nullable(),
+  frequency: z.enum(['ONE_TIME', 'DAILY', 'MONTHLY']).nullable(),
   monthlyDay: z.number().int().min(1).max(28).nullable(),
   note: z.string().max(500).nullable(),
   /** Model's read: does the message use pressure / urgency phrasing. */
@@ -93,7 +93,7 @@ export const resolvedPlanSchema = z.object({
   recipientNameFromMessage: z.boolean().default(false),
   amount: z.number().positive(),
   asset: transferAssetSchema,
-  frequency: z.enum(['ONE_TIME', 'MONTHLY']),
+  frequency: z.enum(['ONE_TIME', 'DAILY', 'MONTHLY']),
   monthlyDay: z.number().int().min(1).max(28).nullable(),
   note: z.string().max(500).nullable(),
 });

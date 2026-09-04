@@ -17,6 +17,12 @@ import {
   RecipientError,
   updateRecipient,
 } from './recipients/store';
+import {
+  isTransactionStoreError,
+  listTransactions,
+  recordSettledTransaction,
+} from './transactions/store';
+import { listRecurringRules, RecurringRuleError, saveRecurringRule } from './recurring/store';
 import { assessPlan } from './safety/assess-plan';
 import type { SavedRecipient } from './safety/consensus';
 import { hashPlan, reviewMessage } from './safety/review';
@@ -59,6 +65,24 @@ function writeRecipientError(response: ServerResponse, error: unknown, requestId
   }
   const message = error instanceof Error ? error.message : 'Recipient operation failed';
   writeApiError(response, 500, 'RECIPIENT_FAILED', message, requestId);
+}
+
+function writeTransactionError(response: ServerResponse, error: unknown, requestId: string): void {
+  if (isTransactionStoreError(error)) {
+    writeApiError(response, 400, 'TRANSACTION_INVALID', error.message, requestId);
+    return;
+  }
+  const message = error instanceof Error ? error.message : 'Transaction operation failed';
+  writeApiError(response, 500, 'TRANSACTION_FAILED', message, requestId);
+}
+
+function writeRecurringRuleError(response: ServerResponse, error: unknown, requestId: string): void {
+  if (error instanceof RecurringRuleError || error instanceof RecipientError) {
+    writeApiError(response, 400, 'RECURRING_RULE_INVALID', error.message, requestId);
+    return;
+  }
+  const message = error instanceof Error ? error.message : 'Recurring rule operation failed';
+  writeApiError(response, 500, 'RECURRING_RULE_FAILED', message, requestId);
 }
 
 const server = createServer((request, response) => {
@@ -168,6 +192,71 @@ const server = createServer((request, response) => {
     listRecipients(owner)
       .then((recipients) => writeJson(response, 200, { recipients }, requestId))
       .catch((error: unknown) => writeRecipientError(response, error, requestId));
+    return;
+  }
+
+  if (method === 'GET' && path === '/v1/transactions') {
+    const owner = new URL(request.url || '/', 'http://localhost').searchParams.get('owner');
+    if (!owner) {
+      writeApiError(response, 400, 'OWNER_REQUIRED', 'owner is required', requestId);
+      return;
+    }
+    listTransactions(owner)
+      .then((transactions) => writeJson(response, 200, { transactions }, requestId))
+      .catch((error: unknown) => writeTransactionError(response, error, requestId));
+    return;
+  }
+
+  if (method === 'POST' && path === '/v1/transactions') {
+    readJsonBody(request)
+      .then(async (body) => {
+        const owner = asString(body.owner);
+        const digest = asString(body.digest);
+        const recipient = asString(body.recipient);
+        const amount = asString(body.amount);
+        const asset = asString(body.asset);
+        const network = asString(body.network);
+        if (!owner || !digest || !recipient || !amount || !asset || !network) {
+          writeApiError(response, 400, 'INVALID_REQUEST', 'owner, digest, recipient, amount, asset and network are required', requestId);
+          return;
+        }
+        const transaction = await recordSettledTransaction({ owner, digest, recipient, amount, asset, network });
+        writeJson(response, 200, { transaction }, requestId);
+      })
+      .catch((error: unknown) => writeTransactionError(response, error, requestId));
+    return;
+  }
+
+  if (method === 'GET' && path === '/v1/recurring-rules') {
+    const owner = new URL(request.url || '/', 'http://localhost').searchParams.get('owner');
+    if (!owner) {
+      writeApiError(response, 400, 'OWNER_REQUIRED', 'owner is required', requestId);
+      return;
+    }
+    listRecurringRules(owner)
+      .then((rules) => writeJson(response, 200, { rules }, requestId))
+      .catch((error: unknown) => writeRecurringRuleError(response, error, requestId));
+    return;
+  }
+
+  if (method === 'POST' && path === '/v1/recurring-rules') {
+    readJsonBody(request)
+      .then(async (body) => {
+        const owner = asString(body.owner);
+        const recipientName = asString(body.recipientName);
+        const recipient = asString(body.recipient);
+        const amount = asString(body.amount);
+        const asset = asString(body.asset);
+        const frequency = asString(body.frequency);
+        const monthlyDay = typeof body.monthlyDay === 'number' && Number.isInteger(body.monthlyDay) ? body.monthlyDay : null;
+        if (!owner || !recipientName || !recipient || !amount || !asset || !frequency) {
+          writeApiError(response, 400, 'INVALID_REQUEST', 'owner, recipientName, recipient, amount, asset and frequency are required', requestId);
+          return;
+        }
+        const rule = await saveRecurringRule({ owner, recipientName, recipient, amount, asset, frequency, monthlyDay });
+        writeJson(response, 200, { rule }, requestId);
+      })
+      .catch((error: unknown) => writeRecurringRuleError(response, error, requestId));
     return;
   }
 

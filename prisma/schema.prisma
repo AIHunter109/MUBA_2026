@@ -88,6 +88,7 @@ model Transaction {
   userId          String
   paymentIntentId String?        @unique
   recipientId     String?
+  recipientAddress String?
   amount          Decimal
   asset           String
   status          String
@@ -110,6 +111,7 @@ model RecurringRule {
   recipientId     String
   amount          Decimal
   asset           String
+  frequency       String         @default("MONTHLY")
   monthlyDay      Int
   timezone        String
   nextTriggerAt   DateTime

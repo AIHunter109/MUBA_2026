@@ -88,11 +88,6 @@ export default function SettingsScreen() {
         </View>
 
         <PlaceholderCard
-          title="VeriPlan"
-          detail="Plan your budget before setting up recurring remittances. Describe your income, essential expenses, savings target, and family support, and budget analysis will help explain payment affordability."
-          action="Create a plan"
-        />
-        <PlaceholderCard
           title="Guardians"
           detail="Trusted people who can provide a second approval for high-value or high-risk payments."
           action="Add guardian"
@@ -103,8 +98,7 @@ export default function SettingsScreen() {
           action="Add policy"
         />
         <Text className="text-xs leading-5 text-slate-500">
-          VeriPlan, guardians, and payment policies are visual placeholders. Their connected
-          workflows will be available in later phases.
+          Guardians and payment policies are visual placeholders. Configure them in a future phase.
         </Text>
       </View>
     </AppPage>

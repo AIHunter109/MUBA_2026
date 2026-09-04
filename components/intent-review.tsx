@@ -88,6 +88,8 @@ export function IntentReviewCard({ review }: { review: IntentReview }) {
             <Text className="text-sm text-slate-300">
               {plan.frequency === 'MONTHLY'
                 ? `Every month on day ${plan.monthlyDay ?? 1}`
+                : plan.frequency === 'DAILY'
+                  ? 'Every day'
                 : 'One time'}
             </Text>
           </Row>

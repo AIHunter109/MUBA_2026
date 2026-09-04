@@ -16,7 +16,7 @@ import {
 import { type Recipient, useRecipients } from '@/lib/recipients/use-recipients';
 import { SUPPORTED_COINS, toBaseUnits, USDC_COIN } from '@/lib/sui/coins';
 import { apiPost } from '@/lib/sui/api';
-import { explorerTxUrl } from '@/lib/sui/network';
+import { explorerTxUrl, SUI_NETWORK } from '@/lib/sui/network';
 import { saveSettledTransaction } from '@/lib/transactions/ledger';
 import type { IntentReview, ResolvedPlan, TransferAsset } from '@/shared/contracts';
 
@@ -113,19 +113,20 @@ export default function SendScreen() {
     if (!review?.plan) {
       return;
     }
+    const plan = review.plan;
     setError(null);
     setPhase('submitting');
     try {
       const signer = await getSigner();
-      const result = await confirmAndExecute(signer, review.plan);
+      const result = await confirmAndExecute(signer, plan);
 
       const nameToSave = saveName.trim();
-      if (nameToSave && !review.plan.recipientKnown) {
+      if (nameToSave && !plan.recipientKnown) {
         try {
           await apiPost('/v1/recipients', {
             owner,
             name: nameToSave,
-            address: review.plan.recipientAddress,
+            address: plan.recipientAddress,
           });
           setRecipientSaveNotice({ ok: true, name: nameToSave, message: `Saved ${nameToSave} to your recipients.` });
         } catch (saveErr) {
@@ -144,22 +145,54 @@ export default function SendScreen() {
       }
 
       if (result.status === 'success') {
-        // A local activity-record failure must never turn a settled on-chain payment into a UI failure.
+        const coin = SUPPORTED_COINS.find((c) => c.symbol === plan.asset) ?? USDC_COIN;
+        const record = {
+          id: result.digest,
+          digest: result.digest,
+          recipient: plan.recipientAddress,
+          amountBaseUnits: toBaseUnits(String(plan.amount), coin.decimals).toString(),
+          coinType: coin.type,
+          symbol: coin.symbol,
+          decimals: coin.decimals,
+          occurredAt: new Date().toISOString(),
+          status: 'success' as const,
+        };
+
+        // Local storage makes the receipt instant; the API ledger lets the
+        // dashboard recover it on a different device or after storage is cleared.
         try {
-          const coin = SUPPORTED_COINS.find((c) => c.symbol === review.plan?.asset) ?? USDC_COIN;
           await saveSettledTransaction({
-            id: result.digest,
-            digest: result.digest,
-            recipient: review.plan.recipientAddress,
-            amountBaseUnits: toBaseUnits(String(review.plan.amount), coin.decimals).toString(),
-            coinType: coin.type,
-            symbol: coin.symbol,
-            decimals: coin.decimals,
-            occurredAt: new Date().toISOString(),
-            status: 'success',
+            ...record,
           });
         } catch {
-          // The on-chain receipt remains the source of truth on the result screen.
+          // A settled payment must still succeed if its offline cache is unavailable.
+        }
+        try {
+          await apiPost('/v1/transactions', {
+            owner,
+            digest: record.digest,
+            recipient: record.recipient,
+            amount: String(plan.amount),
+            asset: record.symbol,
+            network: SUI_NETWORK,
+          });
+        } catch {
+          // The local receipt remains available and a future send can retry its own record.
+        }
+        if (plan.frequency !== 'ONE_TIME') {
+          try {
+            await apiPost('/v1/recurring-rules', {
+              owner,
+              recipientName: plan.recipientName,
+              recipient: plan.recipientAddress,
+              amount: String(plan.amount),
+              asset: plan.asset,
+              frequency: plan.frequency,
+              monthlyDay: plan.monthlyDay,
+            });
+          } catch {
+            // The current transfer remains settled even if its future schedule cannot be saved.
+          }
         }
       }
 

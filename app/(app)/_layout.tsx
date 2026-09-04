@@ -40,6 +40,7 @@ export default function AppLayout() {
         <Label>{t('settings')}</Label>
         <Icon sf="gearshape.fill" androidSrc={<VectorIcon family={Ionicons} name="settings" />} />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="remit-plan" hidden />
     </NativeTabs>
   );
 }

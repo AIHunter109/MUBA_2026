@@ -14,6 +14,7 @@ export function shouldUseFixtures(env: Environment): boolean {
 const AMOUNT_RE = /(\d+(?:\.\d+)?)\s*(usdc|sui)?/i;
 const URGENT_RE = /\b(urgent|urgently|emergency|asap|right now|immediately|hospital|stranded|please help)\b/i;
 const MONTHLY_RE = /\b(every month|each month|monthly|recurring)\b/i;
+const DAILY_RE = /\b(every day|each day|daily)\b/i;
 const THIS_MONTH_RE = /\bthis month\b/i;
 const ADDRESS_RE = /0x[0-9a-fA-F]{3,64}/;
 
@@ -64,7 +65,7 @@ function baseIntent(message: string): ParsedIntent {
     recipientLabel,
     amount: amountMatch ? Number(amountMatch[1]) : null,
     asset: amountMatch ? asset : null,
-    frequency: MONTHLY_RE.test(message) ? 'MONTHLY' : 'ONE_TIME',
+    frequency: DAILY_RE.test(message) ? 'DAILY' : MONTHLY_RE.test(message) ? 'MONTHLY' : 'ONE_TIME',
     monthlyDay: null,
     note: /for ([^.,]+)/i.exec(message)?.[1]?.trim().slice(0, 120) ?? null,
     urgencyLanguage: urgency,
@@ -87,7 +88,7 @@ export function fixtureReads(env: Environment, message: string): ModelRead[] {
   // Verifier drifts on ambiguous "this month" phrasing to demonstrate DISPUTED.
   const verifier: ParsedIntent = {
     ...parser,
-    frequency: THIS_MONTH_RE.test(message) && !MONTHLY_RE.test(message) ? 'MONTHLY' : parser.frequency,
+    frequency: THIS_MONTH_RE.test(message) && !MONTHLY_RE.test(message) && !DAILY_RE.test(message) ? 'MONTHLY' : parser.frequency,
     confidence: Math.max(0, parser.confidence - 0.1),
     rationale: 'Independent re-read of the same message.',
   };
