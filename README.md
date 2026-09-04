@@ -12,7 +12,14 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Start the API in a second terminal. It provides the Sui balance and transfer endpoints used by
+   the app.
+
+   ```bash
+   npm.cmd run server
+   ```
+
+3. Start the app
 
    ```bash
    npx expo start

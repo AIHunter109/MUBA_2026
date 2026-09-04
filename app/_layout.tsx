@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
+import { I18nProvider } from '@/lib/i18n/i18n-context';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -37,9 +38,11 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <StatusBar style="light" />
-      <RootNavigator />
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <StatusBar style="light" />
+        <RootNavigator />
+      </AuthProvider>
+    </I18nProvider>
   );
 }

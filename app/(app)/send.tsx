@@ -7,11 +7,14 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { type CoinMeta, SUI_COIN, SUPPORTED_COINS, toBaseUnits, USDC_COIN } from '@/lib/sui/coins';
 import { explorerTxUrl } from '@/lib/sui/network';
 import { executeTransfer, type TransferOutcome } from '@/lib/sui/transfer';
+import { saveSettledTransaction } from '@/lib/transactions/ledger';
+import { useI18n } from '@/lib/i18n/i18n-context';
 
 type Phase = 'form' | 'submitting' | 'done';
 
 export default function SendScreen() {
   const { getSigner } = useAuth();
+  const { t } = useI18n();
 
   const [coin, setCoin] = useState<CoinMeta>(USDC_COIN);
   const [recipient, setRecipient] = useState('');
@@ -51,6 +54,24 @@ export default function SendScreen() {
         amountBaseUnits,
         coinType: coin.type,
       });
+      if (result.status === 'success') {
+        // A local activity-record failure must never turn a settled on-chain payment into a UI failure.
+        try {
+          await saveSettledTransaction({
+            id: result.digest,
+            digest: result.digest,
+            recipient: recipient.trim(),
+            amountBaseUnits: amountBaseUnits.toString(),
+            coinType: coin.type,
+            symbol: coin.symbol,
+            decimals: coin.decimals,
+            occurredAt: new Date().toISOString(),
+            status: 'success',
+          });
+        } catch {
+          // The on-chain receipt remains the source of truth on the result screen.
+        }
+      }
       setOutcome(result);
       setPhase('done');
     } catch (err) {
@@ -64,12 +85,12 @@ export default function SendScreen() {
     return (
       <Screen gap={24}>
         <Text className={`text-3xl font-bold ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
-          {ok ? 'Transfer settled' : 'Transfer failed on chain'}
+          {ok ? t('transferSettled') : t('transferFailed')}
         </Text>
 
         {ok ? (
           <Text className="text-base leading-6 text-slate-300">
-            {amount} {coin.symbol} sent to{'\n'}
+            {amount} {coin.symbol} {t('sentTo')}{'\n'}
             <Text className="font-mono text-sm">{recipient.trim()}</Text>
           </Text>
         ) : (
@@ -77,7 +98,7 @@ export default function SendScreen() {
         )}
 
         <View className="gap-2 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <Text className="text-sm text-slate-400">Transaction digest</Text>
+          <Text className="text-sm text-slate-400">{t('transactionDigest')}</Text>
           <Text className="font-mono text-xs text-slate-200" selectable>
             {outcome.digest}
           </Text>
@@ -87,7 +108,7 @@ export default function SendScreen() {
               void Linking.openURL(explorerTxUrl(outcome.digest));
             }}
           >
-            <Text className="text-sm font-semibold text-emerald-400">View on explorer</Text>
+            <Text className="text-sm font-semibold text-emerald-400">{t('explorer')}</Text>
           </Pressable>
         </View>
 
@@ -96,7 +117,7 @@ export default function SendScreen() {
           onPress={reset}
           className="items-center rounded-xl bg-blue-600 px-5 py-4 active:bg-blue-500"
         >
-          <Text className="text-base font-bold text-white">Send another</Text>
+          <Text className="text-base font-bold text-white">{t('sendAnother')}</Text>
         </Pressable>
       </Screen>
     );
@@ -105,9 +126,9 @@ export default function SendScreen() {
   return (
     <Screen gap={24} keyboardShouldPersistTaps="handled">
       <View className="gap-1">
-        <Text className="text-3xl font-bold tracking-tight text-white">Send</Text>
+        <Text className="text-3xl font-bold tracking-tight text-white">{t('sendTitle')}</Text>
         <Text className="text-sm leading-5 text-slate-400">
-          Choose an asset, enter a recipient and amount.
+          {t('sendSubtitle')}
         </Text>
       </View>
 
@@ -133,7 +154,7 @@ export default function SendScreen() {
       </View>
 
       <View className="gap-2">
-        <Text className="text-sm font-medium text-slate-300">Recipient Sui address</Text>
+        <Text className="text-sm font-medium text-slate-300">{t('recipientAddress')}</Text>
         <TextInput
           value={recipient}
           onChangeText={setRecipient}
@@ -148,12 +169,12 @@ export default function SendScreen() {
           accessibilityRole="button"
           onPress={() => setRecipient(Ed25519Keypair.generate().toSuiAddress())}
         >
-          <Text className="text-xs font-semibold text-blue-400">Fill a throwaway test address</Text>
+          <Text className="text-xs font-semibold text-blue-400">{t('testAddress')}</Text>
         </Pressable>
       </View>
 
       <View className="gap-2">
-        <Text className="text-sm font-medium text-slate-300">Amount ({coin.symbol})</Text>
+        <Text className="text-sm font-medium text-slate-300">{t('amount')} ({coin.symbol})</Text>
         <TextInput
           value={amount}
           onChangeText={setAmount}
@@ -167,7 +188,7 @@ export default function SendScreen() {
 
       {coin.type === SUI_COIN.type ? (
         <Text className="text-xs leading-5 text-slate-500">
-          Sending SUI also spends a little SUI on gas.
+          {t('gasNote')}
         </Text>
       ) : null}
 
@@ -186,13 +207,12 @@ export default function SendScreen() {
       >
         {phase === 'submitting' ? <ActivityIndicator color="#ffffff" /> : null}
         <Text className="text-base font-bold text-white">
-          {phase === 'submitting' ? 'Submitting...' : 'Send'}
+          {phase === 'submitting' ? t('sending') : t('sendMoney')}
         </Text>
       </Pressable>
 
       <Text className="text-xs leading-5 text-slate-500">
-        This build signs and submits directly from the app. Backend confirmation, sponsorship, and
-        the AI safety review come in later phases.
+        {t('sendBuildNote')}
       </Text>
     </Screen>
   );

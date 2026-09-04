@@ -88,8 +88,10 @@ const server = createServer((request, response) => {
         writeApiError(
           response,
           invalid ? 400 : 502,
-          invalid ? 'INVALID_ADDRESS' : 'SUI_READ_FAILED',
-          message,
+          invalid ? 'INVALID_ADDRESS' : 'SUI_RPC_UNAVAILABLE',
+          invalid
+            ? message
+            : 'The RemitGuard API is running, but it cannot reach Sui testnet. Check your internet/firewall or configure SUI_RPC_URL.',
           requestId,
         );
       });

@@ -3,9 +3,11 @@ import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { DEMO_MODE, isEnokiConfigured } from '@/lib/auth/enoki-config';
+import { useI18n } from '@/lib/i18n/i18n-context';
 
 export default function SignInScreen() {
   const { signIn, isAuthenticating, error } = useAuth();
+  const { t } = useI18n();
 
   return (
     <View className="flex-1 justify-center gap-8 bg-slate-950 px-5">
@@ -17,8 +19,7 @@ export default function SignInScreen() {
         </View>
         <Text className="text-4xl font-bold tracking-tight text-white">RemitGuard</Text>
         <Text className="text-base leading-6 text-slate-400">
-          Sign in with Google to create your self-custodial Sui wallet. You review every
-          transfer before any money moves.
+          {t('signInDescription')}
         </Text>
       </View>
 
@@ -35,7 +36,7 @@ export default function SignInScreen() {
           {isAuthenticating ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text className="text-base font-bold text-white">Continue with Google</Text>
+            <Text className="text-base font-bold text-white">{t('continueGoogle')}</Text>
           )}
         </Pressable>
 
@@ -48,7 +49,7 @@ export default function SignInScreen() {
 
       {DEMO_MODE ? (
         <View className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-          <Text className="font-semibold text-amber-200">Demo mode</Text>
+          <Text className="font-semibold text-amber-200">{t('demoMode')}</Text>
           <Text className="mt-1 text-sm leading-5 text-amber-300">
             {isEnokiConfigured && Platform.OS !== 'web'
               ? 'Real Google zkLogin runs on web for now. On this device, sign-in creates a local testnet wallet with no Google account.'

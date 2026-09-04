@@ -3,7 +3,9 @@ import { z } from 'zod';
 const optionalUrl = z.string().url().optional().or(z.literal(''));
 
 const environmentSchema = z.object({
-  DATABASE_URL: z.string().min(1),
+  // The read-only Sui API can run without the database during the demo. Database-backed
+  // recipients, schedules, and audit records will opt in by providing this value.
+  DATABASE_URL: z.string().min(1).optional(),
   SERVER_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   DEMO_MODE: z.coerce.boolean().default(true),
   SUI_NETWORK: z.enum(['testnet', 'devnet']).default('testnet'),
