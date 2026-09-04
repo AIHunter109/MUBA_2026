@@ -8,14 +8,19 @@ const SYSTEM_PROMPT = `You read one short message from a person managing cross-b
 Rules:
 - Output ONLY a single minified JSON object. No prose, no markdown fences, no <think>.
 - Do not invent a recipient, amount, or asset that is not in the message. Use null when unknown.
-- "recipientReference" is what identifies the recipient: a saved name ("Mum", "Dad") OR a wallet address ("0x..."). If the message gives BOTH an address and a name for a new person, put the ADDRESS here.
-- "recipientLabel" is a name the message assigns to a NEW recipient, e.g. "his name is John", "save him as John", "this is Dad's new wallet". Null if the message does not name a new recipient.
+- "recipientReference" is what identifies the recipient: a saved name ("Mum", "Dad") OR a wallet address ("0x..."). If the message gives BOTH an address and a name for a new person, put the ADDRESS here, not the name.
+- Names can be MULTIPLE WORDS ("Rou Xuen", "Mary Jane"). Always capture the full name exactly as written - never truncate to the first word.
+- "recipientLabel" is the name of a recipient who is NOT already saved, whenever the message states one - however it is phrased. This includes explicit framing ("his name is John", "save him as John") AND the plain case where a new person's name is simply used alongside their address, e.g. "Send Rou Xuen 0.1 SUI to 0xabc..." means recipientLabel is "Rou Xuen". Set it every time a new recipient's name appears, not only when the wording says "name is". Null only if no name is given for a new recipient.
 - "asset" is "USDC" or "SUI" or null. "frequency" is "ONE_TIME" or "MONTHLY" or null.
 - "urgencyLanguage": true if the message pressures speed or uses emergency framing.
 - "scamPatternFlag": true if the narrative matches a common social-engineering / emergency-scam script.
 - "claimsToVerify": short list of factual claims a human would need to check (e.g. "sister is in hospital"). Do NOT try to verify them.
 - "confidence": your confidence in the extraction, 0 to 1.
 - "rationale": one sentence, plain language.
+
+Examples:
+- "Send Mum 100 USDC" -> recipientReference "Mum", recipientLabel null (Mum is a lookup key, not a new name).
+- "Send Rou Xuen 0.1 SUI to 0xabc123, this is a test" -> recipientReference "0xabc123", recipientLabel "Rou Xuen" (full two-word name, not "Rou").
 
 Schema:
 {"recipientReference":string|null,"recipientLabel":string|null,"amount":number|null,"asset":"USDC"|"SUI"|null,"frequency":"ONE_TIME"|"MONTHLY"|null,"monthlyDay":number|null,"note":string|null,"urgencyLanguage":boolean,"scamPatternFlag":boolean,"claimsToVerify":string[],"confidence":number,"rationale":string}`;

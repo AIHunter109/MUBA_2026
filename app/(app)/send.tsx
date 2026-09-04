@@ -49,6 +49,11 @@ export default function SendScreen() {
   const [acknowledged, setAcknowledged] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [outcome, setOutcome] = useState<TransferOutcome | null>(null);
+  const [recipientSaveNotice, setRecipientSaveNotice] = useState<{
+    ok: boolean;
+    name: string;
+    message: string;
+  } | null>(null);
 
   const owner = session?.walletAddress ?? '';
 
@@ -59,6 +64,7 @@ export default function SendScreen() {
     setAcknowledged(false);
     setSaveName('');
     setOutcome(null);
+    setRecipientSaveNotice(null);
     setMessage('');
     setPicked(null);
     setOtherAddress('');
@@ -115,11 +121,26 @@ export default function SendScreen() {
 
       const nameToSave = saveName.trim();
       if (nameToSave && !review.plan.recipientKnown) {
-        await apiPost('/v1/recipients', {
-          owner,
-          name: nameToSave,
-          address: review.plan.recipientAddress,
-        }).catch(() => undefined);
+        try {
+          await apiPost('/v1/recipients', {
+            owner,
+            name: nameToSave,
+            address: review.plan.recipientAddress,
+          });
+          setRecipientSaveNotice({ ok: true, name: nameToSave, message: `Saved ${nameToSave} to your recipients.` });
+        } catch (saveErr) {
+          // The transfer already succeeded; a failed save must never look like a failed send.
+          setRecipientSaveNotice({
+            ok: false,
+            name: nameToSave,
+            message:
+              saveErr instanceof Error
+                ? `Transfer sent, but "${nameToSave}" was not saved: ${saveErr.message}`
+                : `Transfer sent, but "${nameToSave}" was not saved.`,
+          });
+        }
+      } else {
+        setRecipientSaveNotice(null);
       }
 
       if (result.status === 'success') {
@@ -169,6 +190,27 @@ export default function SendScreen() {
           <Text className="text-base leading-6 text-slate-300">
             {review.plan.amount} {review.plan.asset} sent to {review.plan.recipientName}.
           </Text>
+        ) : null}
+
+        {recipientSaveNotice ? (
+          <View
+            className={`flex-row items-center gap-2 rounded-xl border p-3 ${
+              recipientSaveNotice.ok
+                ? 'border-emerald-400/20 bg-emerald-400/10'
+                : 'border-amber-400/20 bg-amber-400/10'
+            }`}
+          >
+            <Ionicons
+              name={recipientSaveNotice.ok ? 'bookmark' : 'alert-circle-outline'}
+              size={16}
+              color={recipientSaveNotice.ok ? '#34d399' : '#fbbf24'}
+            />
+            <Text
+              className={`flex-1 text-xs leading-5 ${recipientSaveNotice.ok ? 'text-emerald-200' : 'text-amber-200'}`}
+            >
+              {recipientSaveNotice.message}
+            </Text>
+          </View>
         ) : null}
 
         <View className="gap-2 rounded-2xl border border-slate-800 bg-slate-900 p-5">

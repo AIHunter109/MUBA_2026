@@ -4,7 +4,8 @@ import type { Environment } from '../config';
 /**
  * Deterministic stand-in for the Gonka parser + verifier, used when DEMO_MODE is
  * on or no GONKA_API_KEY is set. Keeps the demo reproducible and offline while
- * the real pipeline stays wired.
+ * the real pipeline stays wired. This is regex-based and deliberately simple -
+ * the real LLM path in parse-intent.ts is far more reliable at reading names.
  */
 export function shouldUseFixtures(env: Environment): boolean {
   return env.DEMO_MODE || !env.GONKA_API_KEY;
@@ -15,25 +16,32 @@ const URGENT_RE = /\b(urgent|urgently|emergency|asap|right now|immediately|hospi
 const MONTHLY_RE = /\b(every month|each month|monthly|recurring)\b/i;
 const THIS_MONTH_RE = /\bthis month\b/i;
 const ADDRESS_RE = /0x[0-9a-fA-F]{3,64}/;
-const NAME_RE = /\b(?:send|pay|transfer|give)\s+(?:to\s+)?([A-Z][a-z]+)\b/i;
-const LABEL_RE =
-  /\b(?:his|her|their|the)?\s*name(?:'s| is)\s+([A-Z][a-z]+)\b|\b(?:call|save|name)\s+(?:him|her|them|it|this wallet)?\s*(?:as\s+)?([A-Z][a-z]+)\b/i;
 
-function extractLabel(message: string): string | null {
-  const m = message.match(LABEL_RE);
-  return (m?.[1] || m?.[2] || '').trim() || null;
-}
+// Case-sensitive on purpose: capitalization is the only signal that separates a
+// name from an ordinary word, so these never carry the /i flag.
+const CAP_WORD_RE = /^[A-Z][a-z]+$/;
+const STOPWORDS = new Set(['The', 'An', 'A', 'Some', 'Money', 'Usdc', 'Sui', 'To', 'For']);
+const NAME_TRIGGER_RE = /\b(?:send|pay|transfer|give)\s+(?:to\s+)?/i;
+const LABEL_TRIGGER_RE =
+  /\b(?:his|her|their|the)?\s*name(?:'s| is)\s+|\b(?:call|save|name)\s+(?:him|her|them|it|this wallet)?\s*(?:as\s+)?/i;
 
-function extractRecipient(message: string): string | null {
-  const address = message.match(ADDRESS_RE);
-  if (address) {
-    return address[0];
+/** Reads up to 3 consecutive Capitalized words starting right after `trigger` matches. */
+function captureNameAfter(message: string, trigger: RegExp): string | null {
+  const match = trigger.exec(message);
+  if (!match) {
+    return null;
   }
-  const name = message.match(NAME_RE);
-  if (name && !/^(the|an?|some|money|usdc|sui)$/i.test(name[1])) {
-    return name[1];
+  const rest = message.slice(match.index + match[0].length);
+  const words: string[] = [];
+  for (const raw of rest.trim().split(/\s+/)) {
+    const word = raw.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '');
+    if (words.length < 3 && CAP_WORD_RE.test(word) && !STOPWORDS.has(word)) {
+      words.push(word);
+    } else {
+      break;
+    }
   }
-  return null;
+  return words.length > 0 ? words.join(' ') : null;
 }
 
 function baseIntent(message: string): ParsedIntent {
@@ -41,9 +49,19 @@ function baseIntent(message: string): ParsedIntent {
   const asset = /sui/i.test(message) ? 'SUI' : 'USDC';
   const urgency = URGENT_RE.test(message);
 
+  const address = message.match(ADDRESS_RE)?.[0] ?? null;
+  const spokenName = captureNameAfter(message, NAME_TRIGGER_RE);
+  const explicitLabel = captureNameAfter(message, LABEL_TRIGGER_RE);
+
+  // "Send Mum 100 USDC" -> the spoken name IS the recipient (a lookup key).
+  // "Send Rou Xuen 0.1 SUI to 0xabc" -> the address is the recipient, and the
+  // name spoken alongside it becomes the label for a brand-new recipient.
+  const recipientReference = address ?? spokenName;
+  const recipientLabel = explicitLabel ?? (address && spokenName ? spokenName : null);
+
   return {
-    recipientReference: extractRecipient(message),
-    recipientLabel: extractLabel(message),
+    recipientReference,
+    recipientLabel,
     amount: amountMatch ? Number(amountMatch[1]) : null,
     asset: amountMatch ? asset : null,
     frequency: MONTHLY_RE.test(message) ? 'MONTHLY' : 'ONE_TIME',
