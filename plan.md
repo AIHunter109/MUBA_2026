@@ -5,7 +5,7 @@ Build RemitGuard as a real Expo 54 client backed by a separate Node/TypeScript s
 ## Confirmed Decisions
 
 - Client: existing Expo `~54.0.36`, Expo Router `~6.0.24`, React 19, React Native 0.81, strict TypeScript, NativeWind 5 preview, and typed routes.
-- Backend: separate Node/TypeScript API with a worker/scheduler. Use Postgres with Prisma unless the contract-discovery spike finds a hosting constraint.
+- Backend: separate Node/TypeScript API with a worker/scheduler. Prisma ORM. Local dev runs on SQLite (`prisma/dev.db`, zero setup); deployment swaps the datasource provider to Postgres plus a fresh migration.
 - Identity: Enoki zkLogin with Google, one active account per device, sign-out supported. Do not put Gonka secrets or private signing material in Expo.
 - Chain: Sui testnet and existing testnet USDC only. Use Enoki sponsorship when its current Expo 54-compatible flow is confirmed; retain an unsponsored development fallback.
 - Platforms: iOS, Android, and web are all first-class shipping targets and all are demoed. The app must work properly on each; a change that only works on one is not finished. Verify every change on iPhone (Expo Go or dev build), an Android device/emulator, and a browser at wide and narrow widths.
@@ -82,6 +82,22 @@ Two `AuthClient` implementations sit behind `resolveAuthClient()` in `lib/auth/a
 
 ### Phase 4: Intent Parsing and Dual-AI Safety
 
+Server-side pipeline is built and tested against the live Gonka key (steps 24-26 and part of 28):
+- `server/src/gonka/client.ts` - Anthropic Messages API adapter (`x-api-key`, 45s timeout, one bounded retry, captures `X-Request-Id`, redacted logs). `extract-json.ts` strips `<think>` / fences and pulls the first balanced object.
+- `server/src/safety/parse-intent.ts` - parser (`deepseek-ai/DeepSeek-V4-Flash-0731`) + verifier (`MiniMaxAI/MiniMax-M2.7`) run in parallel, each normalized to a `ParsedIntent` and validated with Zod; a failed or unparseable read degrades to `ok:false` rather than throwing.
+- `server/src/safety/consensus.ts` - pure module. Merges the two reads (null on one side is "no opinion", not a conflict), flags genuine conflicts as `DISPUTED`, resolves the recipient against the saved book, and emits `SafetyFlag`s (first-time recipient, high amount, urgency language, scam pattern, unverified claims, missing fields). Never blocks; `needs_review` still returns a plan. 16 unit tests.
+- `server/src/safety/fixtures.ts` - deterministic stand-in used when `DEMO_MODE` or no key.
+- `server/src/intent/confirm-token.ts` - HMAC token bound to a hash of the exact transaction bytes, 10-min TTL, single-use. This is the enforceable "the user approved this" gate.
+- Endpoints: `POST /v1/intent/parse` (-> `IntentReview`), `POST /v1/intent/confirm` (validates the plan, builds the PTB, mints the token), `POST /v1/intent/execute` (verifies token vs bytes, consumes it, submits). Verified: forged/mismatched/expired tokens are rejected 403.
+- Shared contracts: `parsedIntentSchema`, `modelReadSchema`, `safetyFlagSchema`, `resolvedPlanSchema`, `intentReviewSchema` in `shared/contracts.ts`.
+
+Send screen rebuilt (steps 21, 27, 28 client side). `app/(app)/send.tsx` has two modes:
+- **Describe it** - a natural-language composer. `compose -> checking -> review -> submitting -> done` state machine. Calls `POST /v1/intent/parse`.
+- **Manual** - pick a saved recipient or paste an address, asset toggle, amount. Calls `POST /v1/intent/assess` (deterministic checks only, no LLM); server has `server/src/safety/assess-plan.ts` feeding a synthetic read into the same `assessIntent`.
+Both funnel to a shared review: `components/intent-review.tsx` shows the resolved plan, saved/first-time badge, every `SafetyFlag`, and each model read (name, latency, `X-Request-Id`, rationale). `needs_review` requires ticking an acknowledgement before "Send anyway"; `cannot_execute` offers only Edit. First-time recipients get an inline "save as [name]" that also `POST /v1/recipients` on send. Confirm runs `confirmAndExecute` in `lib/intent/client.ts`: `/v1/intent/confirm` (server builds the PTB + mints the token) -> local `signer.signTransaction` -> `/v1/intent/execute`. The old `lib/sui/transfer.ts` (tokenless path) was deleted.
+
+Still to do in Phase 4: tie-breaker model call on DISPUTED, persist PaymentIntent + SafetyCheck + Transaction rows, and a real funded end-to-end run through the AI path.
+
 24. Implement a server-side Gonka adapter with strict timeouts, bounded retries, structured-output normalization, model selection, and redacted logs. Do not leak prompts or secrets to the client.
 25. Add parser and independent verifier calls using distinct configured models. Both return normalized intent fields: recipient reference, amount, asset, frequency, date, timezone, notes, confidence/uncertainty, rationale, and request ID.
 26. Implement deterministic consensus and risk logic in a pure module. Compare material intent fields, resolve saved recipients deterministically, flag disagreement, urgency language, new recipients, unusually high amounts, missing fields, and unsupported requests.
@@ -90,6 +106,13 @@ Two `AuthClient` implementations sit behind `resolveAuthClient()` in `lib/auth/a
 29. Test parser/verifier normalization, model disagreement, malformed outputs, timeout/fallback behavior, warning override, duplicate submission, and the guarantee that an unconfirmed intent cannot execute. Use feature-flagged fixtures for a reliable demo path.
 
 ### Phase 5: Recipients, Recurring Payments, and Reconciliation
+
+Recipient store is built (step 30, pulled forward because Phase 4's Send flow needs it):
+- Prisma + SQLite wired. `server/src/db.ts` singleton client; `prisma/migrations/` committed.
+- `server/src/recipients/store.ts` - `resolveUserId(walletAddress)` upserts a `User` + `AuthIdentity(provider:"wallet")` (stand-in until real sessions, step 13). CRUD with Sui address validation, per-user name uniqueness, ownership checks on update/delete.
+- Endpoints: `GET /v1/recipients?owner=`, `POST /v1/recipients`, `POST /v1/recipients/update`, `POST /v1/recipients/delete`. `/v1/intent/parse` now takes `owner` and resolves the recipient book from the DB.
+- Client: `lib/recipients/use-recipients.ts` hook + a real `app/(app)/recipients.tsx` (list, inline add/edit form, delete confirm, first-time-recipient note).
+- Still to do: "save this recipient" step inside the Send flow, safe-delete when transaction history references the recipient.
 
 30. Connect the Recipients UI to authenticated CRUD endpoints and enforce ownership, address format, name uniqueness per user, and safe deletion behavior when history exists.
 31. Add recurring-rule creation from a confirmed intent: recipient, amount, asset, monthly day 1-28, timezone, active/paused state, next trigger, and user-visible notes. Persist all schedule changes.

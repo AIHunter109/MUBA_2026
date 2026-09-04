@@ -34,6 +34,11 @@ yarn-error.*
 .env
 .env*.local
 server/.env
+prisma/.env
+
+# local SQLite database
+prisma/*.db
+prisma/*.db-journal
 
 # typescript
 *.tsbuildinfo

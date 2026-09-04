@@ -21,6 +21,23 @@ export function supportedCoins(environment: Environment): SupportedCoin[] {
   ];
 }
 
+export function coinForAsset(environment: Environment, asset: string): SupportedCoin {
+  const coin = supportedCoins(environment).find((c) => c.symbol === asset.toUpperCase());
+  if (!coin) {
+    throw new Error(`Unsupported asset: ${asset}`);
+  }
+  return coin;
+}
+
+/** Convert a human amount (e.g. 12.5) to integer base units for a coin's decimals. */
+export function amountToBaseUnits(amount: number, decimals: number): bigint {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Amount must be a positive number');
+  }
+  const [whole, fraction = ''] = amount.toFixed(decimals).split('.');
+  return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, '0') || '0');
+}
+
 export function createSuiClient(environment: Environment): SuiGrpcClient {
   return new SuiGrpcClient({
     network: environment.SUI_NETWORK,

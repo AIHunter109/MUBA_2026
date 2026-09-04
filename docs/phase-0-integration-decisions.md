@@ -63,20 +63,23 @@ The current Enoki TypeScript SDK documents `@mysten/enoki`, wallet-standard regi
 
 No custom stablecoin will be created. The first real transfer will use existing testnet USDC only.
 
-## Gonka Contract to Confirm
+## Gonka Contract (confirmed 2026-09-04, live key)
 
-Gonka access is not configured yet. Before adding a client or server SDK, confirm:
-
-- [ ] Base URL and authentication mechanism.
-- [ ] OpenAI-compatible request and response format.
-- [ ] Available model IDs and two distinct models for parser/verifier calls.
-- [ ] Structured-output or JSON-schema support.
-- [ ] Request-ID response field and retention requirements.
-- [ ] Rate limits and maximum prompt/response sizes.
-- [ ] Timeout, retry, and service-unavailable behavior.
-- [ ] Data retention and whether prompts may be persisted.
-
-Until these are confirmed, the server should use an adapter interface and a deterministic fixture implementation rather than hard-coding an assumed Gonka contract.
+- **Base URL:** `https://api.gonkarouter.io`
+- **Auth:** `x-api-key: sk-...` header (or `Authorization: Bearer sk-...`). Server-only, in `server/.env` as `GONKA_API_KEY`.
+- **API:** implements the **Anthropic Messages API** at `POST /v1/messages` (also an OpenAI `POST /v1/chat/completions`). We use the Anthropic path with `anthropic-version: 2023-06-01`. Response is `{ content: [{type:"text", text}], stop_reason, usage }`.
+- **Models** (from `GET /v1/models`, slash- and case-sensitive):
+  - `deepseek-ai/DeepSeek-V4-Flash-0731` - parser. Fast, no visible reasoning trace. 0.7-20s.
+  - `MiniMaxAI/MiniMax-M2.7` - verifier. Reasoning model. 10-33s; emits `<think>` unless the system prompt forbids it.
+  - `moonshotai/Kimi-K2.6` - reserved as the tie-breaker.
+  - Gonka has allocated most capacity to DeepSeek + MiniMax, hence that pair.
+- **No JSON-schema / structured-output mode.** We prompt for minified JSON in the system message, strip `<think>` and fences, extract the first balanced `{...}`, then validate with Zod. Works reliably in testing once the system prompt says "ONLY JSON, no <think>, no markdown".
+- **Request ID:** `X-Request-Id` response header (format `req-<digits>-<digits>`). Verifiable later via `GET /v1/receipts/{id}`. Captured into every `ModelRead`.
+- **Fallback:** `X-Gonka-Fallback` header names a substituted model when upstream is saturated (not seen in testing).
+- **Caching:** identical requests are served from cache in ~150-800ms. Repeated demo phrases are effectively instant on the second run.
+- **Limits:** ~1000 req/min sustainable; 10-min hard timeout, 90s idle. Output can truncate near ~3k tokens on some backends - keep the parser schema small (it is).
+- **Latency risk:** a cold parser+verifier pair is 20-35s. Mitigations: `DEMO_MODE` fixtures are instant; the client must show a "checking" state; rehearse with cached phrases. `GONKA_TIMEOUT_MS=45000`, one bounded retry.
+- **Data retention:** not documented. Prompts contain the user's free-text instruction (may include a recipient name and a personal reason). Treat as sent to a third party; do not send wallet keys or addresses beyond what the instruction already contains.
 
 ## Proposed Authorization Boundary
 

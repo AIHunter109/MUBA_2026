@@ -1,9 +1,28 @@
 import { randomUUID } from 'node:crypto';
-import { createServer, type IncomingMessage } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
+import { resolvedPlanSchema } from '../../shared/contracts';
 import { loadEnvironment } from './config';
 import { writeApiError, writeJson } from './errors';
 import {
+  consumeConfirmationToken,
+  hashTransactionBytes,
+  mintConfirmationToken,
+  verifyConfirmationToken,
+} from './intent/confirm-token';
+import {
+  createRecipient,
+  deleteRecipient,
+  listRecipients,
+  RecipientError,
+  updateRecipient,
+} from './recipients/store';
+import { assessPlan } from './safety/assess-plan';
+import type { SavedRecipient } from './safety/consensus';
+import { hashPlan, reviewMessage } from './safety/review';
+import {
+  amountToBaseUnits,
+  coinForAsset,
   createSuiClient,
   executeSignedTransfer,
   getBalances,
@@ -31,6 +50,15 @@ async function readJsonBody(request: IncomingMessage): Promise<Record<string, un
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function writeRecipientError(response: ServerResponse, error: unknown, requestId: string): void {
+  if (error instanceof RecipientError) {
+    writeApiError(response, 400, 'RECIPIENT_INVALID', error.message, requestId);
+    return;
+  }
+  const message = error instanceof Error ? error.message : 'Recipient operation failed';
+  writeApiError(response, 500, 'RECIPIENT_FAILED', message, requestId);
 }
 
 const server = createServer((request, response) => {
@@ -125,6 +153,197 @@ const server = createServer((request, response) => {
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Unable to prepare transfer';
         writeApiError(response, 400, 'PREPARE_FAILED', message, requestId);
+      });
+    return;
+  }
+
+  if (method === 'GET' && path === '/v1/recipients') {
+    const owner = new URL(request.url || '/', 'http://localhost').searchParams.get('owner');
+    if (!owner) {
+      writeApiError(response, 400, 'OWNER_REQUIRED', 'owner is required', requestId);
+      return;
+    }
+    listRecipients(owner)
+      .then((recipients) => writeJson(response, 200, { recipients }, requestId))
+      .catch((error: unknown) => writeRecipientError(response, error, requestId));
+    return;
+  }
+
+  if (method === 'POST' && (path === '/v1/recipients' || path === '/v1/recipients/update')) {
+    const isUpdate = path === '/v1/recipients/update';
+    readJsonBody(request)
+      .then(async (body) => {
+        const owner = asString(body.owner);
+        const name = asString(body.name);
+        const address = asString(body.address);
+        const id = asString(body.id);
+        if (!owner || !name || !address || (isUpdate && !id)) {
+          writeApiError(response, 400, 'INVALID_REQUEST', 'owner, name and address are required', requestId);
+          return;
+        }
+        const recipient = isUpdate
+          ? await updateRecipient(owner, id as string, name, address)
+          : await createRecipient(owner, name, address);
+        writeJson(response, 200, { recipient }, requestId);
+      })
+      .catch((error: unknown) => writeRecipientError(response, error, requestId));
+    return;
+  }
+
+  if (method === 'POST' && path === '/v1/recipients/delete') {
+    readJsonBody(request)
+      .then(async (body) => {
+        const owner = asString(body.owner);
+        const id = asString(body.id);
+        if (!owner || !id) {
+          writeApiError(response, 400, 'INVALID_REQUEST', 'owner and id are required', requestId);
+          return;
+        }
+        await deleteRecipient(owner, id);
+        writeJson(response, 200, { ok: true }, requestId);
+      })
+      .catch((error: unknown) => writeRecipientError(response, error, requestId));
+    return;
+  }
+
+  if (method === 'POST' && path === '/v1/intent/parse') {
+    readJsonBody(request)
+      .then(async (body) => {
+        const message = asString(body.message);
+        if (!message) {
+          writeApiError(response, 400, 'INVALID_REQUEST', 'message is required', requestId);
+          return;
+        }
+
+        const owner = asString(body.owner);
+        let recipients: SavedRecipient[] = Array.isArray(body.recipients)
+          ? body.recipients
+              .filter(
+                (r): r is SavedRecipient =>
+                  !!r && typeof r === 'object' && typeof (r as SavedRecipient).name === 'string',
+              )
+              .slice(0, 200)
+          : [];
+        if (recipients.length === 0 && owner) {
+          recipients = (await listRecipients(owner)).map((r) => ({ name: r.name, address: r.address }));
+        }
+
+        const review = await reviewMessage(environment, message.slice(0, 2000), recipients);
+        writeJson(response, 200, review, requestId);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unable to review the message';
+        writeApiError(response, 502, 'REVIEW_FAILED', message, requestId);
+      });
+    return;
+  }
+
+  if (method === 'POST' && path === '/v1/intent/assess') {
+    readJsonBody(request)
+      .then(async (body) => {
+        const owner = asString(body.owner);
+        const planResult = resolvedPlanSchema.safeParse(body.plan);
+        if (!owner || !planResult.success) {
+          writeApiError(response, 400, 'INVALID_REQUEST', 'owner and a valid plan are required', requestId);
+          return;
+        }
+        const recipients = (await listRecipients(owner)).map((r) => ({
+          name: r.name,
+          address: r.address,
+        }));
+        const assessment = assessPlan(planResult.data, recipients, {
+          highAmountThreshold: environment.HIGH_AMOUNT_THRESHOLD_USDC,
+        });
+        writeJson(
+          response,
+          200,
+          {
+            ...assessment,
+            planHash: assessment.plan ? hashPlan(assessment.plan) : null,
+            modelReads: [],
+          },
+          requestId,
+        );
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unable to assess the transfer';
+        writeApiError(response, 400, 'ASSESS_FAILED', message, requestId);
+      });
+    return;
+  }
+
+  if (method === 'POST' && path === '/v1/intent/confirm') {
+    readJsonBody(request)
+      .then(async (body) => {
+        const sender = asString(body.sender);
+        const planResult = resolvedPlanSchema.safeParse(body.plan);
+        if (!sender || !planResult.success) {
+          writeApiError(
+            response,
+            400,
+            'INVALID_REQUEST',
+            'sender and a valid plan are required',
+            requestId,
+          );
+          return;
+        }
+        const plan = planResult.data;
+        const coin = coinForAsset(environment, plan.asset);
+
+        const { transactionBytes } = await prepareTransfer(suiClient, {
+          sender,
+          recipient: plan.recipientAddress,
+          coinType: coin.type,
+          amountBaseUnits: amountToBaseUnits(plan.amount, coin.decimals),
+        });
+
+        const confirmationToken = mintConfirmationToken(
+          environment,
+          hashTransactionBytes(transactionBytes),
+        );
+        writeJson(response, 200, { confirmationToken, transactionBytes, plan }, requestId);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unable to prepare the transfer';
+        writeApiError(response, 400, 'CONFIRM_FAILED', message, requestId);
+      });
+    return;
+  }
+
+  if (method === 'POST' && path === '/v1/intent/execute') {
+    readJsonBody(request)
+      .then(async (body) => {
+        const confirmationToken = asString(body.confirmationToken);
+        const transactionBytes = asString(body.transactionBytes);
+        const signature = asString(body.signature);
+        if (!confirmationToken || !transactionBytes || !signature) {
+          writeApiError(
+            response,
+            400,
+            'INVALID_REQUEST',
+            'confirmationToken, transactionBytes and signature are required',
+            requestId,
+          );
+          return;
+        }
+
+        const check = verifyConfirmationToken(
+          environment,
+          confirmationToken,
+          hashTransactionBytes(transactionBytes),
+        );
+        if (!check.ok) {
+          writeApiError(response, 403, 'CONFIRMATION_REQUIRED', check.reason, requestId);
+          return;
+        }
+        consumeConfirmationToken(confirmationToken);
+
+        const result = await executeSignedTransfer(suiClient, { transactionBytes, signature });
+        writeJson(response, 200, result, requestId);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unable to execute transfer';
+        writeApiError(response, 502, 'EXECUTE_FAILED', message, requestId);
       });
     return;
   }
