@@ -42,6 +42,7 @@ export default function AppLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="remit-plan" hidden />
       <NativeTabs.Trigger name="guardians" hidden />
+      <NativeTabs.Trigger name="payment-policies" hidden />
     </NativeTabs>
   );
 }

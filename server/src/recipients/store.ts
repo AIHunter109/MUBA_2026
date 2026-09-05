@@ -111,10 +111,11 @@ export async function updateRecipient(
     throw new RecipientError('Recipient not found');
   }
 
+  const addressChanged = owned.address !== cleanAddress;
   try {
     const row = await prisma.recipient.update({
       where: { id },
-      data: { name: cleanName, address: cleanAddress },
+      data: { name: cleanName, address: cleanAddress, walletChangedAt: addressChanged ? new Date() : owned.walletChangedAt },
     });
     return toDto(row);
   } catch (error) {
