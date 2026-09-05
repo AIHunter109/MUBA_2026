@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { resolvedPlanSchema } from '../../shared/contracts';
 import { loadEnvironment } from './config';
 import { writeApiError, writeJson } from './errors';
+import { checkClaim } from './factcheck/check-claim';
 import {
   consumeConfirmationToken,
   hashTransactionBytes,
@@ -236,6 +237,34 @@ const server = createServer((request, response) => {
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Unable to review the message';
         writeApiError(response, 502, 'REVIEW_FAILED', message, requestId);
+      });
+    return;
+  }
+
+  if (method === 'POST' && path === '/v1/intent/check-claim') {
+    readJsonBody(request)
+      .then(async (body) => {
+        const claim = asString(body.claim);
+        if (!claim) {
+          writeApiError(response, 400, 'INVALID_REQUEST', 'claim is required', requestId);
+          return;
+        }
+        if (!environment.NEWSAPI_KEY) {
+          writeApiError(
+            response,
+            503,
+            'FACTCHECK_UNAVAILABLE',
+            'The fact-checker is not configured on this server (missing NEWSAPI_KEY).',
+            requestId,
+          );
+          return;
+        }
+        const result = await checkClaim(environment, suiClient, claim.slice(0, 400));
+        writeJson(response, 200, result, requestId);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unable to check the claim';
+        writeApiError(response, 502, 'CHECK_CLAIM_FAILED', message, requestId);
       });
     return;
   }

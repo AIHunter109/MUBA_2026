@@ -30,6 +30,12 @@ const environmentSchema = z.object({
   CONFIRMATION_TOKEN_TTL_MS: z.coerce.number().int().positive().default(10 * 60_000),
   RECONCILIATION_WINDOW_DAYS: z.coerce.number().int().positive().default(14),
   HIGH_AMOUNT_THRESHOLD_USDC: z.coerce.number().positive().default(500),
+  // AI Fact Checker (see server/src/factcheck) - retrieves real evidence, then has
+  // two Gonka models reason over it. All three are optional: without them the
+  // claim-check endpoint reports itself unavailable instead of guessing.
+  NEWSAPI_KEY: z.string().optional(),
+  FACTCHECK_PACKAGE_ID: z.string().optional(),
+  FACTCHECK_SIGNER_SECRET_KEY: z.string().optional(),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;

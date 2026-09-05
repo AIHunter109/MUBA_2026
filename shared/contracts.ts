@@ -107,10 +107,68 @@ export const intentReviewSchema = z.object({
   planHash: z.string().nullable(),
   flags: z.array(safetyFlagSchema),
   modelReads: z.array(modelReadSchema),
+  /** Real-world claims either model spotted in the message (e.g. "hurricane in the Philippines") - not verified yet, offered to the user as optional fact-checks. */
+  claims: z.array(z.string()).default([]),
   /** True when the pipeline ran on canned fixtures instead of live Gonka calls. */
   demo: z.boolean(),
 });
 export type IntentReview = z.infer<typeof intentReviewSchema>;
+
+/**
+ * The AI Fact Checker layer: a claim mentioned in a payment message, checked
+ * against real retrieved news evidence (never a model's own memory) by two
+ * independent Gonka models. See server/src/factcheck for the full pipeline.
+ */
+export const claimVerdictSchema = z.enum([
+  'UNVERIFIABLE', // no real evidence could be retrieved - deterministic hard override, ignores model output
+  'SUPPORTED', // evidence found and both models read it as corroborating the claim
+  'CONTRADICTED', // evidence found and both models read it as refuting the claim
+  'DISPUTED', // evidence found but the two models disagreed on what it shows
+]);
+export type ClaimVerdict = z.infer<typeof claimVerdictSchema>;
+
+export const claimEvidenceSchema = z.object({
+  title: z.string(),
+  source: z.string(),
+  url: z.string(),
+  publishedAt: z.string().nullable(),
+  snippet: z.string(),
+});
+export type ClaimEvidence = z.infer<typeof claimEvidenceSchema>;
+
+export const claimStanceSchema = z.enum(['supports', 'contradicts', 'unclear']);
+export type ClaimStance = z.infer<typeof claimStanceSchema>;
+
+export const claimModelReadSchema = z.object({
+  role: z.enum(['parser', 'verifier']),
+  model: z.string(),
+  requestId: z.string().nullable(),
+  latencyMs: z.number(),
+  ok: z.boolean(),
+  error: z.string().nullable(),
+  stance: claimStanceSchema.nullable(),
+  rationale: z.string().nullable(),
+  citedEvidenceIndex: z.number().int().nullable(),
+});
+export type ClaimModelRead = z.infer<typeof claimModelReadSchema>;
+
+export const claimCheckResultSchema = z.object({
+  claim: z.string(),
+  verdict: claimVerdictSchema,
+  /** A 0-100 restatement of the verdict, in the language the Gonka brief asks for. Not an independent computation - derived 1:1 from `verdict`. */
+  truthScore: z.number().min(0).max(100),
+  evidence: z.array(claimEvidenceSchema),
+  modelReads: z.array(claimModelReadSchema),
+  onChain: z
+    .object({
+      network: z.literal('sui-testnet'),
+      packageId: z.string(),
+      txDigest: z.string(),
+      explorerUrl: z.string(),
+    })
+    .nullable(),
+});
+export type ClaimCheckResult = z.infer<typeof claimCheckResultSchema>;
 
 export const apiErrorSchema = z.object({
   error: z.object({

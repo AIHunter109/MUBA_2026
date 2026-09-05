@@ -1,7 +1,7 @@
 import type { Signer } from '@mysten/sui/cryptography';
 import { fromBase64 } from '@mysten/sui/utils';
 
-import type { IntentReview, ResolvedPlan } from '@/shared/contracts';
+import type { ClaimCheckResult, IntentReview, ResolvedPlan } from '@/shared/contracts';
 import { apiPost } from '@/lib/sui/api';
 
 export type TransferOutcome = { digest: string; status: 'success' | 'failure'; error?: string };
@@ -9,6 +9,15 @@ export type TransferOutcome = { digest: string; status: 'success' | 'failure'; e
 /** Natural-language path: two models parse, deterministic code decides. */
 export function parseMessage(owner: string, message: string): Promise<IntentReview> {
   return apiPost<IntentReview>('/v1/intent/parse', { owner, message });
+}
+
+/**
+ * The AI Fact Checker "extra security layer": retrieves real evidence for one
+ * claim mentioned in the message, has two Gonka models read it, and returns a
+ * deterministic verdict plus (if configured) a link to the on-chain record.
+ */
+export function checkClaim(claim: string): Promise<ClaimCheckResult> {
+  return apiPost<ClaimCheckResult>('/v1/intent/check-claim', { claim });
 }
 
 /** Manual path: deterministic checks only (first-time recipient, high amount). */

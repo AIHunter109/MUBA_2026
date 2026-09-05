@@ -4,7 +4,7 @@ import { Link, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, Text, TextInput, View } from 'react-native';
 
-import { IntentReviewCard } from '@/components/intent-review';
+import { IntentChat } from '@/components/intent-chat';
 import { Screen } from '@/components/screen';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
@@ -46,8 +46,8 @@ export default function SendScreen() {
   const [amount, setAmount] = useState('');
 
   const [review, setReview] = useState<IntentReview | null>(null);
-  const [acknowledged, setAcknowledged] = useState(false);
-  const [saveName, setSaveName] = useState('');
+  // null = the chat hasn't finished asking its questions yet; '' or a name = it has.
+  const [resolvedSaveName, setResolvedSaveName] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<TransferOutcome | null>(null);
   const [recipientSaveNotice, setRecipientSaveNotice] = useState<{
     ok: boolean;
@@ -61,8 +61,7 @@ export default function SendScreen() {
     setPhase('compose');
     setError(null);
     setReview(null);
-    setAcknowledged(false);
-    setSaveName('');
+    setResolvedSaveName(null);
     setOutcome(null);
     setRecipientSaveNotice(null);
     setMessage('');
@@ -99,9 +98,7 @@ export default function SendScreen() {
         result = await assessManualPlan(owner, plan);
       }
       setReview(result);
-      // If the message named a new recipient, pre-fill the save field.
-      setSaveName(result.plan?.recipientNameFromMessage ? result.plan.recipientName : '');
-      setAcknowledged(false);
+      setResolvedSaveName(null);
       setPhase('review');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not run the safety check.');
@@ -110,7 +107,7 @@ export default function SendScreen() {
   }, [mode, owner, message, picked, manualAddress, amount, asset]);
 
   const send = useCallback(async () => {
-    if (!review?.plan) {
+    if (!review?.plan || resolvedSaveName === null) {
       return;
     }
     setError(null);
@@ -119,7 +116,7 @@ export default function SendScreen() {
       const signer = await getSigner();
       const result = await confirmAndExecute(signer, review.plan);
 
-      const nameToSave = saveName.trim();
+      const nameToSave = resolvedSaveName.trim();
       if (nameToSave && !review.plan.recipientKnown) {
         try {
           await apiPost('/v1/recipients', {
@@ -169,7 +166,7 @@ export default function SendScreen() {
       setError(err instanceof Error ? err.message : 'The transfer failed.');
       setPhase('review');
     }
-  }, [review, getSigner, saveName, owner]);
+  }, [review, getSigner, resolvedSaveName, owner]);
 
   // --- done -----------------------------------------------------------------
   if (phase === 'done' && outcome) {
@@ -237,94 +234,65 @@ export default function SendScreen() {
     );
   }
 
-  // --- review -------------------------------------------------------------
+  // --- review (interactive chat) ------------------------------------------
   if ((phase === 'review' || phase === 'submitting') && review) {
-    const canExecute = review.status !== 'cannot_execute' && review.plan != null;
-    const needsAck = review.status === 'needs_review';
-    const offerSave =
-      review.plan != null &&
-      !review.plan.recipientKnown &&
-      isValidSuiAddress(review.plan.recipientAddress);
+    const blocked = review.status === 'cannot_execute';
+    const ready = !blocked && resolvedSaveName !== null && review.plan != null;
 
     return (
-      <Screen gap={20}>
-        <Text className="text-2xl font-bold tracking-tight text-white">Review</Text>
+      <Screen gap={16}>
+        <Text className="text-2xl font-bold tracking-tight text-white">Checking your transfer</Text>
 
-        <IntentReviewCard review={review} />
+        <IntentChat
+          review={review}
+          onResolved={(name) => setResolvedSaveName(name)}
+          onCancelled={() => {
+            setPhase('compose');
+            setResolvedSaveName(null);
+            setError(null);
+          }}
+        />
 
         {error ? <Text className="text-sm leading-5 text-red-400">{error}</Text> : null}
 
-        {offerSave ? (
-          <View className="gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-            <View className="flex-row items-center gap-2">
-              <Ionicons name="bookmark-outline" size={14} color="#64748b" />
-              <Text className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                {saveName.trim() ? 'Save as' : 'Save this recipient'}
+        {ready ? (
+          <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4">
+            <View className="flex-row items-baseline justify-between">
+              <Text className="text-sm text-slate-400">Sending</Text>
+              <Text className="text-lg font-bold text-white">
+                {review.plan!.amount} {review.plan!.asset}
               </Text>
             </View>
-            <TextInput
-              value={saveName}
-              onChangeText={setSaveName}
-              placeholder="Name (leave blank to skip)"
-              placeholderTextColor="#475569"
-              className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100"
-            />
-            {review.plan?.recipientNameFromMessage ? (
-              <Text className="text-[11px] leading-4 text-slate-500">
-                Name taken from your message. Edit or clear it to change what gets saved.
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-
-        {needsAck ? (
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: acknowledged }}
-            onPress={() => setAcknowledged((v) => !v)}
-            className="flex-row items-center gap-3 rounded-xl border border-amber-400/20 bg-amber-400/10 p-4"
-          >
-            <Ionicons
-              name={acknowledged ? 'checkbox' : 'square-outline'}
-              size={20}
-              color="#fbbf24"
-            />
-            <Text className="flex-1 text-sm leading-5 text-amber-200">
-              I have read the warnings and want to send anyway.
-            </Text>
-          </Pressable>
-        ) : null}
-
-        <View className="gap-2">
-          {canExecute ? (
+            <View className="flex-row items-baseline justify-between">
+              <Text className="text-sm text-slate-400">To</Text>
+              <Text className="text-sm font-semibold text-white">{review.plan!.recipientName}</Text>
+            </View>
             <Pressable
               accessibilityRole="button"
-              disabled={phase === 'submitting' || (needsAck && !acknowledged)}
+              disabled={phase === 'submitting'}
               onPress={send}
               className="flex-row items-center justify-center gap-3 rounded-xl bg-blue-600 px-5 py-4 active:bg-blue-500 disabled:opacity-50"
             >
               {phase === 'submitting' ? <ActivityIndicator color="#ffffff" /> : null}
               <Text className="text-base font-bold text-white">
-                {phase === 'submitting'
-                  ? 'Sending...'
-                  : needsAck
-                    ? 'Send anyway'
-                    : 'Confirm and send'}
+                {phase === 'submitting' ? 'Sending...' : 'Confirm and send'}
               </Text>
             </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            disabled={phase === 'submitting'}
-            onPress={() => {
-              setPhase('compose');
-              setError(null);
-            }}
-            className="items-center rounded-xl border border-slate-700 px-5 py-4 active:bg-slate-800 disabled:opacity-50"
-          >
-            <Text className="text-sm font-semibold text-slate-300">Edit</Text>
-          </Pressable>
-        </View>
+          </View>
+        ) : null}
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={phase === 'submitting'}
+          onPress={() => {
+            setPhase('compose');
+            setResolvedSaveName(null);
+            setError(null);
+          }}
+          className="items-center rounded-xl border border-slate-700 px-5 py-4 active:bg-slate-800 disabled:opacity-50"
+        >
+          <Text className="text-sm font-semibold text-slate-300">Edit message</Text>
+        </Pressable>
       </Screen>
     );
   }

@@ -42,6 +42,7 @@ export function assessIntent(
           detail: 'Neither model could turn this message into a transfer. Rephrase it or use the manual form.',
         },
       ],
+      claims: [],
       demo,
     };
   }
@@ -140,7 +141,7 @@ export function assessIntent(
     flags.push({
       code: 'UNVERIFIED_CLAIMS',
       severity: 'info',
-      detail: `Unverified claims in the message: ${claims.join('; ')}. RemitGuard does not fact-check these.`,
+      detail: `You mentioned: "${claims.join('; ')}". RemitGuard's AI cannot verify real-world events or news - confirm this yourself (call the person, check a news source) before relying on it.`,
     });
   }
 
@@ -182,7 +183,7 @@ export function assessIntent(
       ? 'ready'
       : 'needs_review';
 
-  return { status, verdict, plan, planHash: null, flags, demo };
+  return { status, verdict, plan, planHash: null, flags, claims, demo };
 }
 
 type ResolvedRecipient = {
