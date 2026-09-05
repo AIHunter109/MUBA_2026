@@ -78,3 +78,8 @@ export async function listRecurringRules(owner: string): Promise<RecurringRuleDt
   const rows = await prisma.recurringRule.findMany({ where: { userId, status: 'ACTIVE' }, orderBy: { nextTriggerAt: 'asc' }, include: { recipient: true } });
   return rows.map(toDto);
 }
+
+export async function deleteRecurringRule(owner: string, id: string): Promise<void> {
+  const userId = await resolveUserId(owner);
+  await prisma.recurringRule.deleteMany({ where: { id, userId } });
+}

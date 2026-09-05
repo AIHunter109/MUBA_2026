@@ -22,9 +22,9 @@ import {
   listTransactions,
   recordSettledTransaction,
 } from './transactions/store';
-import { listRecurringRules, RecurringRuleError, saveRecurringRule } from './recurring/store';
+import { deleteRecurringRule, listRecurringRules, RecurringRuleError, saveRecurringRule } from './recurring/store';
 import { addGuardian, approvalGate, decideRequest, GuardianError, listApprovalRequests, listGuardians, removeGuardian, savePolicy } from './guardians/store';
-import { BudgetPlanError, listBudgetPlans, saveBudgetPlan } from './budget/store';
+import { BudgetPlanError, deleteBudgetPlan, listBudgetPlans, saveBudgetPlan } from './budget/store';
 import { assessPlan } from './safety/assess-plan';
 import type { SavedRecipient } from './safety/consensus';
 import { hashPlan, reviewMessage } from './safety/review';
@@ -144,6 +144,14 @@ const server = createServer((request, response) => {
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Unable to read balances';
         const invalid = message === 'Invalid Sui address';
+        if (environment.DEMO_MODE && !invalid) {
+          writeJson(response, 200, {
+            owner,
+            balances: supportedCoins(environment).map((coin) => ({ coinType: coin.type, symbol: coin.symbol, decimals: coin.decimals, balance: '0' })),
+            offline: true,
+          }, requestId);
+          return;
+        }
         writeApiError(
           response,
           invalid ? 400 : 502,
@@ -277,6 +285,9 @@ const server = createServer((request, response) => {
   if (method === 'POST' && path === '/v1/budget-plans') {
     readJsonBody(request).then(async body => { const keys = ['owner', 'recipientName', 'recipientAddress', 'income', 'essentials', 'savings', 'monthlySupport', 'remaining', 'asset', 'frequency', 'result', 'explanation']; const input: Record<string, string> = {}; for (const key of keys) { const value = asString(body[key]); if (!value) { writeApiError(response, 400, 'INVALID_REQUEST', `${key} is required`, requestId); return; } input[key] = value; } writeJson(response, 200, { plan: await saveBudgetPlan(input) }, requestId); }).catch((error: unknown) => writeBudgetPlanError(response, error, requestId)); return;
   }
+  if (method === 'POST' && path === '/v1/budget-plans/delete') {
+    readJsonBody(request).then(async body => { const owner = asString(body.owner); const id = asString(body.id); if (!owner || !id) { writeApiError(response, 400, 'INVALID_REQUEST', 'owner and id are required', requestId); return; } await deleteBudgetPlan(owner, id); writeJson(response, 200, { ok: true }, requestId); }).catch((error: unknown) => writeBudgetPlanError(response, error, requestId)); return;
+  }
 
   if (method === 'POST' && path === '/v1/recurring-rules') {
     readJsonBody(request)
@@ -297,6 +308,9 @@ const server = createServer((request, response) => {
       })
       .catch((error: unknown) => writeRecurringRuleError(response, error, requestId));
     return;
+  }
+  if (method === 'POST' && path === '/v1/recurring-rules/delete') {
+    readJsonBody(request).then(async body => { const owner = asString(body.owner); const id = asString(body.id); if (!owner || !id) { writeApiError(response, 400, 'INVALID_REQUEST', 'owner and id are required', requestId); return; } await deleteRecurringRule(owner, id); writeJson(response, 200, { ok: true }, requestId); }).catch((error: unknown) => writeRecurringRuleError(response, error, requestId)); return;
   }
 
   if (method === 'POST' && (path === '/v1/recipients' || path === '/v1/recipients/update')) {

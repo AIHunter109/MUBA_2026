@@ -11,6 +11,16 @@ import { getTransactionLedger, type TransactionRecord } from '@/lib/transactions
 import { useI18n } from '@/lib/i18n/i18n-context';
 
 type BalanceRow = { coinType: string; symbol: string; decimals: number; balance: string };
+type BalanceApiResponse = { balances: BalanceRow[]; offline?: boolean };
+type SuiBalanceResponse = { totalBalance?: string };
+type SuiJsonRpcResponse = {
+  result?: SuiBalanceResponse;
+  error?: { message?: string };
+};
+
+// This is a browser/device fallback for when the local API cannot reach Sui.
+// It only reads public on-chain balance data; transfers still use the API flow.
+const SUI_TESTNET_RPC_URL = 'https://sui-testnet-rpc.publicnode.com';
 type StoredTransaction = {
   digest: string;
   recipient: string;
@@ -31,10 +41,56 @@ type RecurringRule = {
 };
 
 async function fetchBalances(address: string): Promise<BalanceRow[]> {
-  const { balances } = await apiGet<{ balances: BalanceRow[] }>(
-    `/v1/balances?owner=${encodeURIComponent(address)}`,
-  );
-  return balances;
+  let apiFallback: BalanceRow[] | null = null;
+  let apiError: unknown;
+
+  try {
+    const response = await apiGet<BalanceApiResponse>(
+      `/v1/balances?owner=${encodeURIComponent(address)}`,
+    );
+    if (!response.offline) {
+      return response.balances;
+    }
+    apiFallback = response.balances;
+  } catch (error) {
+    apiError = error;
+  }
+
+  try {
+    const balances = await Promise.all(
+      SUPPORTED_COINS.map(async (coin, index): Promise<BalanceRow> => {
+        const response = await fetch(SUI_TESTNET_RPC_URL, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: index + 1,
+            method: 'suix_getBalance',
+            params: [address, coin.type],
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(`Sui balance request failed (${response.status}).`);
+        }
+        const body = (await response.json()) as SuiJsonRpcResponse;
+        if (body.error) {
+          throw new Error(body.error.message ?? 'Sui balance request failed.');
+        }
+        return {
+          coinType: coin.type,
+          symbol: coin.symbol,
+          decimals: coin.decimals,
+          balance: body.result?.totalBalance ?? '0',
+        };
+      }),
+    );
+    return balances;
+  } catch (directError) {
+    if (apiFallback) {
+      return apiFallback;
+    }
+    throw apiError ?? directError;
+  }
 }
 
 async function fetchStoredTransactions(address: string): Promise<TransactionRecord[]> {

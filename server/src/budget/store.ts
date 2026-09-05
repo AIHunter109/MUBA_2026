@@ -14,5 +14,16 @@ export async function saveBudgetPlan(input: Record<string, string>) {
 export async function listBudgetPlans(owner: string) {
   const userId = await resolveUserId(owner);
   const rows = await prisma.budgetPlan.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 20 });
-  return rows.map(row => ({ id: row.id, recipientName: row.recipientName, income: row.income.toString(), essentials: row.essentials.toString(), savings: row.savings.toString(), monthlySupport: row.monthlySupport.toString(), remaining: row.remaining.toString(), asset: row.asset, frequency: row.frequency, result: row.result, explanation: row.explanation, createdAt: row.createdAt.toISOString() }));
+  return rows.map(row => ({ id: row.id, recipientName: row.recipientName, recipientAddress: row.recipientAddress, income: row.income.toString(), essentials: row.essentials.toString(), savings: row.savings.toString(), monthlySupport: row.monthlySupport.toString(), remaining: row.remaining.toString(), asset: row.asset, frequency: row.frequency, result: row.result, explanation: row.explanation, createdAt: row.createdAt.toISOString() }));
+}
+
+export async function deleteBudgetPlan(owner: string, id: string) {
+  const userId = await resolveUserId(owner);
+  const plan = await prisma.budgetPlan.findFirst({ where: { id, userId } });
+  if (!plan) throw new BudgetPlanError('Budget plan not found');
+  const recipient = await prisma.recipient.findFirst({ where: { userId, address: plan.recipientAddress } });
+  if (recipient) {
+    await prisma.recurringRule.deleteMany({ where: { userId, recipientId: recipient.id, asset: plan.asset, frequency: plan.frequency, status: 'ACTIVE' } });
+  }
+  await prisma.budgetPlan.delete({ where: { id } });
 }

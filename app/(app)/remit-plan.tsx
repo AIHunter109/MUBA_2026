@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import { AppPage } from '@/components/app-page';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -13,8 +13,8 @@ type Asset = 'USDC' | 'SUI';
 type Result = 'Comfortable' | 'Tight' | 'Over Budget';
 type Phase = 'edit' | 'review' | 'saving' | 'done';
 type ViewMode = 'create' | 'plans' | null;
-type SavedPlan = { id: string; recipientName: string; income: string; essentials: string; savings: string; monthlySupport: string; remaining: string; asset: Asset; frequency: string; result: Result; explanation: string; createdAt: string };
-type RecurringPlan = { id: string; recipientName: string; amount: string; asset: Asset; frequency: string; nextTriggerAt: string };
+type SavedPlan = { id: string; recipientName: string; recipientAddress: string; income: string; essentials: string; savings: string; monthlySupport: string; remaining: string; asset: Asset; frequency: string; result: Result; explanation: string; createdAt: string };
+type RecurringPlan = { id: string; recipientName: string; recipientAddress: string; amount: string; asset: Asset; frequency: string; nextTriggerAt: string };
 
 const FREQUENCIES: { value: Frequency; label: string; monthlyMultiplier: number }[] = [
   { value: 'WEEKLY', label: 'Weekly', monthlyMultiplier: 52 / 12 },
@@ -62,6 +62,7 @@ export default function RemitPlanScreen() {
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
   const [recurringPlans, setRecurringPlans] = useState<RecurringPlan[]>([]);
   const [plansError, setPlansError] = useState<string | null>(null);
+  const [pendingRecurringDeleteId, setPendingRecurringDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(null);
 
   const loadSavedPlans = useCallback(async () => {
@@ -132,6 +133,22 @@ export default function RemitPlanScreen() {
     }
   };
 
+  const deletePlan = (plan: SavedPlan) => {
+    Alert.alert('Delete RemitPlan?', `This removes ${plan.recipientName}'s budget plan and its matching active recurring remittance.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => void apiPost('/v1/budget-plans/delete', { owner: session?.walletAddress, id: plan.id }).then(loadSavedPlans).catch(error => setError(error instanceof Error ? error.message : 'Could not delete plan.')) },
+    ]);
+  };
+  const deleteRecurringPlan = async (plan: RecurringPlan) => {
+    try {
+      await apiPost('/v1/recurring-rules/delete', { owner: session?.walletAddress, id: plan.id });
+      setPendingRecurringDeleteId(null);
+      await loadSavedPlans();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not delete recurring remittance.');
+    }
+  };
+
   if (phase === 'done') {
     return (
       <AppPage title="RemitPlan" subtitle="Your recurring family-support plan is ready.">
@@ -191,6 +208,7 @@ export default function RemitPlanScreen() {
       </Pressable>
     </View>
   );
+  const selectedModeHeader = <View className="flex-row items-center justify-between rounded-xl border border-blue-400/20 bg-blue-400/10 px-4 py-3"><Text className="font-semibold text-blue-200">{viewMode === 'create' ? 'Create plan' : 'Review plans'}</Text><Pressable accessibilityRole="button" onPress={() => setViewMode(null)} className="rounded-lg border border-blue-300/30 px-3 py-1.5"><Text className="text-xs font-semibold text-blue-200">Cancel</Text></Pressable></View>;
 
   if (viewMode === null) {
     return (
@@ -207,10 +225,12 @@ export default function RemitPlanScreen() {
   if (viewMode === 'plans') {
     return (
       <AppPage title="RemitPlan" subtitle="Review the budget plans you have confirmed.">
-        {planSwitcher}
+        {selectedModeHeader}
         {plansError ? <Text className="text-sm text-red-300">{plansError}</Text> : null}
         {savedPlans.length ? <View className="gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-5"><View className="flex-row items-center gap-2"><Ionicons name="clipboard-outline" size={19} color="#34d399" /><Text className="text-base font-bold text-white">Budget plans</Text></View>{savedPlans.map((plan) => <View key={plan.id} className="gap-2 border-t border-emerald-400/10 pt-3"><View className="flex-row items-center justify-between gap-3"><Text className="font-semibold text-slate-200">{plan.recipientName} · {plan.frequency.toLowerCase()}</Text><Text className={`text-sm font-bold ${plan.result === 'Comfortable' ? 'text-emerald-300' : plan.result === 'Tight' ? 'text-amber-300' : 'text-red-300'}`}>{plan.result}</Text></View><Text className="text-xs text-slate-400">Income {plan.income} − essentials {plan.essentials} − savings {plan.savings} − support {plan.monthlySupport} = <Text className="font-semibold text-slate-200">{plan.remaining} {plan.asset}</Text></Text><Text className="text-xs leading-5 text-slate-500">{plan.explanation}</Text></View>)}</View> : null}
-        {recurringPlans.length ? <View className="gap-3 rounded-2xl border border-blue-400/20 bg-blue-400/5 p-5"><View className="flex-row items-center gap-2"><Ionicons name="calendar-outline" size={19} color="#60a5fa" /><Text className="text-base font-bold text-white">Recurring remittances</Text></View>{recurringPlans.map((plan) => <View key={plan.id} className="gap-1 border-t border-blue-400/10 pt-3"><Text className="font-semibold text-slate-200">{plan.recipientName} · {plan.amount} {plan.asset} · {plan.frequency.toLowerCase()}</Text><Text className="text-xs text-slate-500">Next payment: {new Date(plan.nextTriggerAt).toLocaleDateString()}</Text></View>)}</View> : null}
+        {savedPlans.length ? <View className="gap-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-5"><Text className="text-base font-bold text-white">Full budget-plan details</Text>{savedPlans.map((plan) => <View key={`${plan.id}-details`} className="gap-3 border-t border-slate-700 pt-4"><View><Text className="font-semibold text-white">{plan.recipientName} · {plan.frequency.toLowerCase()}</Text><Text selectable className="mt-1 font-mono text-[11px] text-slate-500">{plan.recipientAddress}</Text></View><SummaryRow label="Monthly income" value={`${plan.income} ${plan.asset}`} /><SummaryRow label="Essential expenses" value={`−${plan.essentials} ${plan.asset}`} /><SummaryRow label="Savings target" value={`−${plan.savings} ${plan.asset}`} /><SummaryRow label="Planned family support" value={`−${plan.monthlySupport} ${plan.asset}/month`} /><View className="border-t border-slate-700 pt-3"><SummaryRow label="Remaining monthly balance" value={`${plan.remaining} ${plan.asset}`} strong /></View><Text className={`text-sm font-bold ${plan.result === 'Comfortable' ? 'text-emerald-300' : plan.result === 'Tight' ? 'text-amber-300' : 'text-red-300'}`}>{plan.result}</Text><Text className="text-xs leading-5 text-slate-400">{plan.explanation}</Text><Pressable accessibilityRole="button" onPress={() => deletePlan(plan)} className="self-start rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2"><Text className="text-xs font-semibold text-red-300">Delete plan</Text></Pressable></View>)}</View> : null}
+        {recurringPlans.length ? <View className="gap-3 rounded-2xl border border-blue-400/20 bg-blue-400/5 p-5"><View className="flex-row items-center gap-2"><Ionicons name="calendar-outline" size={19} color="#60a5fa" /><Text className="text-base font-bold text-white">Recurring remittances</Text></View>{recurringPlans.map((plan) => { const budgetPlan = savedPlans.find(item => item.recipientAddress === plan.recipientAddress && item.asset === plan.asset && item.frequency === plan.frequency); return <View key={plan.id} className="gap-2 border-t border-blue-400/10 pt-3"><Text className="font-semibold text-slate-200">{plan.recipientName} · {plan.amount} {plan.asset} · {plan.frequency.toLowerCase()}</Text><Text selectable className="font-mono text-[11px] text-slate-500">{plan.recipientAddress}</Text><Text className="text-xs text-slate-500">Next payment: {new Date(plan.nextTriggerAt).toLocaleDateString()}</Text>{budgetPlan ? <View className="gap-2 rounded-xl border border-slate-700 bg-slate-950/40 p-3"><SummaryRow label="Monthly income" value={`${budgetPlan.income} ${budgetPlan.asset}`} /><SummaryRow label="Essential expenses" value={`−${budgetPlan.essentials} ${budgetPlan.asset}`} /><SummaryRow label="Savings target" value={`−${budgetPlan.savings} ${budgetPlan.asset}`} /><SummaryRow label="Monthly family support" value={`−${budgetPlan.monthlySupport} ${budgetPlan.asset}`} /><SummaryRow label="Remaining balance" value={`${budgetPlan.remaining} ${budgetPlan.asset}`} strong /><Text className={`text-sm font-bold ${budgetPlan.result === 'Comfortable' ? 'text-emerald-300' : budgetPlan.result === 'Tight' ? 'text-amber-300' : 'text-red-300'}`}>{budgetPlan.result}</Text><Text className="text-xs leading-5 text-slate-400">{budgetPlan.explanation}</Text></View> : <Text className="text-xs leading-5 text-slate-500">This older schedule has no saved budget snapshot. New RemitPlans save the complete affordability breakdown.</Text>}</View>; })}</View> : null}
+        {recurringPlans.length ? <View className="gap-2">{recurringPlans.map(plan => <Pressable key={`${plan.id}-delete`} accessibilityRole="button" onPress={() => pendingRecurringDeleteId === plan.id ? void deleteRecurringPlan(plan) : setPendingRecurringDeleteId(plan.id)} className={`self-start rounded-lg border px-3 py-2 ${pendingRecurringDeleteId === plan.id ? 'border-red-400 bg-red-500' : 'border-red-400/30 bg-red-400/10'}`}><Text className={`text-xs font-semibold ${pendingRecurringDeleteId === plan.id ? 'text-white' : 'text-red-300'}`}>{pendingRecurringDeleteId === plan.id ? `Confirm delete ${plan.recipientName}` : `Delete recurring remittance for ${plan.recipientName}`}</Text></Pressable>)}</View> : null}
         {!savedPlans.length && !recurringPlans.length && !plansError ? <View className="items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-6"><Ionicons name="clipboard-outline" size={28} color="#64748b" /><Text className="font-semibold text-slate-200">No saved plans yet</Text><Text className="text-center text-sm text-slate-500">Create and confirm a RemitPlan to review it here.</Text></View> : null}
       </AppPage>
     );
@@ -218,7 +238,7 @@ export default function RemitPlanScreen() {
 
   return (
     <AppPage title="RemitPlan" subtitle="Plan family support around your real monthly budget before setting up a recurring remittance.">
-      {planSwitcher}
+      {selectedModeHeader}
       <Section title="Planning asset" detail="Use one asset for all budget inputs so affordability math stays meaningful.">
         <View className="flex-row gap-2">
           {(['USDC', 'SUI'] as Asset[]).map((item) => <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: asset === item }} onPress={() => setAsset(item)} className={`flex-1 rounded-xl border px-3 py-3 ${asset === item ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-950/50'}`}><Text className={`text-center text-sm font-semibold ${asset === item ? 'text-blue-300' : 'text-slate-300'}`}>{item}</Text></Pressable>)}
