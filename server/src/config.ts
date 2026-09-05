@@ -41,7 +41,11 @@ const environmentSchema = z.object({
 export type Environment = z.infer<typeof environmentSchema>;
 
 export function loadEnvironment(source: NodeJS.ProcessEnv = process.env): Environment {
-  const result = environmentSchema.safeParse(source);
+  // Most hosts (Render, Railway, Fly, etc.) inject the port to bind on as `PORT`.
+  // Honor it without needing a separate `SERVER_PORT` to be set on the host.
+  const normalized: NodeJS.ProcessEnv =
+    !source.SERVER_PORT && source.PORT ? { ...source, SERVER_PORT: source.PORT } : source;
+  const result = environmentSchema.safeParse(normalized);
 
   if (!result.success) {
     const issues = result.error.issues

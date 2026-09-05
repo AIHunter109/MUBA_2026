@@ -1,0 +1,37 @@
+# Render blueprint for the RemitGuard backend (server/src/index.ts).
+# Deploy: render.com -> New -> Blueprint -> connect this repo.
+# Then set the secret env vars marked `sync: false` in the dashboard.
+#
+# Note: the free plan has no persistent disk, so the SQLite database resets on
+# every deploy. Fine for a demo (re-add recipients after a deploy); switch the
+# Prisma provider to Postgres + a Render Postgres instance if you need it to
+# stick.
+services:
+  - type: web
+    name: remitguard-api
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install
+    startCommand: npm run server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: DATABASE_URL
+        value: file:./dev.db
+      - key: DEMO_MODE
+        value: "false"
+      - key: SUI_NETWORK
+        value: testnet
+      - key: CONFIRMATION_TOKEN_SECRET
+        generateValue: true
+      - key: GONKA_API_KEY
+        sync: false
+      - key: NEWSAPI_KEY
+        sync: false
+      # Optional - on-chain fact-check verdict recording. Leave unset to skip it.
+      - key: FACTCHECK_PACKAGE_ID
+        sync: false
+      - key: FACTCHECK_SIGNER_SECRET_KEY
+        sync: false
