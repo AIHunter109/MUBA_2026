@@ -67,10 +67,11 @@ export default function RemitPlanScreen() {
   const [plansError, setPlansError] = useState<string | null>(null);
   const [pendingRecurringDeleteId, setPendingRecurringDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(null);
+  const walletAddress = session?.walletAddress;
 
   const loadSavedPlans = useCallback(async () => {
-    if (!session?.walletAddress) return;
-    const owner = encodeURIComponent(session.walletAddress);
+    if (!walletAddress) return;
+    const owner = encodeURIComponent(walletAddress);
     const [budgetResult, recurringResult] = await Promise.allSettled([
       apiGet<{ plans: SavedPlan[] }>(`/v1/budget-plans?owner=${owner}`),
       apiGet<{ rules: RecurringPlan[] }>(`/v1/recurring-rules?owner=${owner}`),
@@ -78,7 +79,7 @@ export default function RemitPlanScreen() {
     setSavedPlans(budgetResult.status === 'fulfilled' ? budgetResult.value.plans : []);
     setRecurringPlans(recurringResult.status === 'fulfilled' ? recurringResult.value.rules : []);
     setPlansError(budgetResult.status === 'rejected' && recurringResult.status === 'rejected' ? 'Could not load plans. Make sure the RemitGuard server is running, then try again.' : null);
-  }, [session?.walletAddress]);
+  }, [walletAddress]);
 
   useFocusEffect(useCallback(() => { void loadSavedPlans(); }, [loadSavedPlans]));
 
