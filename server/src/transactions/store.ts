@@ -144,8 +144,9 @@ export async function listTransactions(
     orderBy: { createdAt: 'desc' },
     take: 100,
     include: { recipient: { select: { address: true, name: true } } },
-  }), prisma.recipient.findMany({ where: { userId }, select: { address: true, name: true } })]);
+  }), prisma.recipient.findMany({ where: { userId }, select: { id: true, address: true, name: true } })]);
   const namesByAddress = new Map(recipients.map((recipient) => [recipient.address, recipient.name]));
+  const recipientIdByAddress = new Map(recipients.map((recipient) => [recipient.address, recipient.id]));
 
   const dbTransactions: TransactionDto[] = rows
     .filter((row): row is typeof row & { digest: string } => Boolean(row.digest))
@@ -168,18 +169,50 @@ export async function listTransactions(
   let onChainTransactions: TransactionDto[] = [];
   try {
     const transfers = await listOnChainReceivedTransfers(chain.client, chain.environment, owner);
-    onChainTransactions = transfers
-      .filter((t) => !knownDigests.has(t.digest))
-      .map((t) => ({
-        digest: t.digest,
-        recipient: t.from,
-        recipientName: namesByAddress.get(t.from),
-        amount: t.amount,
-        asset: t.asset,
-        status: 'success' as const,
-        occurredAt: t.occurredAt,
-        direction: 'RECEIVED' as const,
-      }));
+    const newTransfers = transfers.filter((t) => !knownDigests.has(t.digest));
+
+    // Persist the moment a transfer is found, not just return it for this
+    // request. Detection only works while the received coin is still unspent
+    // and unmerged - once it is spent (the very next send, in practice), the
+    // trail back to it is gone. Writing it to the database here means it
+    // survives that: every future load reads it back as a normal recorded
+    // transaction, regardless of what happens to the coin afterwards.
+    await Promise.all(
+      newTransfers.map((t) =>
+        prisma.transaction
+          .upsert({
+            where: { userId_digest: { userId, digest: t.digest } },
+            create: {
+              userId,
+              recipientId: recipientIdByAddress.get(t.from),
+              recipientAddress: t.from,
+              amount: t.amount,
+              asset: t.asset,
+              status: 'success',
+              digest: t.digest,
+              network: chain.environment.SUI_NETWORK,
+              direction: 'RECEIVED',
+              createdAt: new Date(t.occurredAt),
+            },
+            update: {},
+          })
+          .catch(() => {
+            // A write failing for one transfer must not lose the others - it
+            // will simply be detected (and this write retried) on the next load.
+          }),
+      ),
+    );
+
+    onChainTransactions = newTransfers.map((t) => ({
+      digest: t.digest,
+      recipient: t.from,
+      recipientName: namesByAddress.get(t.from),
+      amount: t.amount,
+      asset: t.asset,
+      status: 'success' as const,
+      occurredAt: t.occurredAt,
+      direction: 'RECEIVED' as const,
+    }));
   } catch {
     // The app's own recorded history must still load if the chain read fails.
   }
