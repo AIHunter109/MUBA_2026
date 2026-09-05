@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link, Redirect, Slot, usePathname } from 'expo-router';
-import { Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
+import { Text } from '@/components/translated-text';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { useI18n } from '@/lib/i18n/i18n-context';
@@ -80,7 +81,7 @@ export default function AppLayoutWeb() {
   const { t } = useI18n();
   const { width } = useWindowDimensions();
   const nav: NavItem[] = [
-    { label: t('home'), href: '/(app)', icon: 'home-outline' }, { label: t('send'), href: '/(app)/send', icon: 'paper-plane-outline' }, { label: 'RemitPlan', href: '/(app)/remit-plan', icon: 'calculator-outline' }, { label: 'Guardians', href: '/(app)/guardians', icon: 'shield-checkmark-outline' }, { label: t('recipients'), href: '/(app)/recipients', icon: 'people-outline' }, { label: t('history'), href: '/(app)/history', icon: 'receipt-outline' }, { label: t('settings'), href: '/(app)/settings', icon: 'settings-outline' },
+    { label: t('home'), href: '/(app)', icon: 'home-outline' }, { label: t('send'), href: '/(app)/send', icon: 'paper-plane-outline' }, { label: t('remitPlan'), href: '/(app)/remit-plan', icon: 'calculator-outline' }, { label: t('guardians'), href: '/(app)/guardians', icon: 'shield-checkmark-outline' }, { label: t('recipients'), href: '/(app)/recipients', icon: 'people-outline' }, { label: t('history'), href: '/(app)/history', icon: 'receipt-outline' }, { label: t('settings'), href: '/(app)/settings', icon: 'settings-outline' },
   ];
   const bottomNav = nav.filter((item) => ['/(app)', '/(app)/send', '/(app)/remit-plan', '/(app)/guardians', '/(app)/settings'].includes(item.href));
 

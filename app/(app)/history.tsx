@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, RefreshControl, View } from 'react-native';
+import { Text } from '@/components/translated-text';
 
 import { Screen } from '@/components/screen';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -51,7 +52,7 @@ async function loadTransactions(owner: string): Promise<TransactionRecord[]> {
 
 export default function HistoryScreen() {
   const { session } = useAuth();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,21 +85,21 @@ export default function HistoryScreen() {
         </View>
       ) : null}
       <View className="gap-3">
-        {transactions.map((transaction) => <HistoryRow key={transaction.digest} transaction={transaction} />)}
+        {transactions.map((transaction) => <HistoryRow key={transaction.digest} transaction={transaction} t={t} language={language} />)}
       </View>
     </Screen>
   );
 }
 
-function HistoryRow({ transaction }: { transaction: TransactionRecord }) {
+function HistoryRow({ transaction, t, language }: { transaction: TransactionRecord; t: (key: string, values?: Record<string, string>) => string; language: string }) {
   const date = new Date(transaction.occurredAt);
   const recipient = transaction.recipientName ?? (transaction.recipient ? `${transaction.recipient.slice(0, 8)}…${transaction.recipient.slice(-6)}` : 'Unknown recipient');
   return (
     <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(explorerTxUrl(transaction.digest))} className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 active:bg-slate-800">
       <View className="flex-row items-center justify-between gap-3">
         <View className="min-w-0 flex-1">
-          <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>Sent to {recipient}</Text>
-          <Text className="mt-1 text-xs text-slate-500">{date.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</Text>
+          <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>{t('sentToRecipient', { recipient })}</Text>
+          <Text className="mt-1 text-xs text-slate-500">{date.toLocaleString(language, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</Text>
         </View>
         <Text className="text-sm font-bold text-white">−{fromBaseUnits(BigInt(transaction.amountBaseUnits), transaction.decimals)} {transaction.symbol}</Text>
       </View>

@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, TextInput, View } from 'react-native';
+import { Text } from '@/components/translated-text';
 
 import { Screen } from '@/components/screen';
 import { type Recipient, useRecipients } from '@/lib/recipients/use-recipients';
+import { useI18n } from '@/lib/i18n/i18n-context';
 
 function shortAddress(address: string): string {
   return address.length > 14 ? `${address.slice(0, 8)}...${address.slice(-6)}` : address;
@@ -11,20 +13,21 @@ function shortAddress(address: string): string {
 
 export default function RecipientsScreen() {
   const { recipients, isLoading, error, add, update, remove } = useRecipients();
+  const { t } = useI18n();
   const [editing, setEditing] = useState<Recipient | 'new' | null>(null);
 
   return (
     <Screen>
       <View className="flex-row items-center justify-between">
         <View className="gap-1">
-          <Text className="text-3xl font-bold tracking-tight text-white">Recipients</Text>
+          <Text className="text-3xl font-bold tracking-tight text-white">{t('recipientsTitle')}</Text>
           <Text className="text-sm leading-5 text-slate-400">
-            Saved wallets your instructions can resolve by name.
+            {t('recipientsIntro')}
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Add recipient"
+          accessibilityLabel={t('addRecipient')}
           onPress={() => setEditing('new')}
           className="h-10 w-10 items-center justify-center rounded-xl bg-blue-600 active:bg-blue-500"
         >
@@ -55,9 +58,9 @@ export default function RecipientsScreen() {
         </Text>
       ) : recipients.length === 0 && !editing ? (
         <View className="items-center gap-1 rounded-2xl border border-dashed border-slate-800 bg-slate-900/30 px-5 py-8">
-          <Text className="text-sm font-semibold text-slate-300">No saved recipients</Text>
+          <Text className="text-sm font-semibold text-slate-300">{t('noSavedRecipients')}</Text>
           <Text className="text-center text-xs leading-5 text-slate-500">
-            Add a family member so &quot;Send Mum 100 USDC&quot; resolves to their wallet.
+            {t('recipientExample')}
           </Text>
         </View>
       ) : (
@@ -77,7 +80,7 @@ export default function RecipientsScreen() {
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Edit ${r.name}`}
+              accessibilityLabel={`${t('edit')} ${r.name}`}
               onPress={() => setEditing(r)}
               className="p-2 active:opacity-60"
             >
@@ -85,11 +88,11 @@ export default function RecipientsScreen() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Delete ${r.name}`}
+              accessibilityLabel={`${t('delete')} ${r.name}`}
               onPress={() =>
-                Alert.alert('Delete recipient', `Remove ${r.name}?`, [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => void remove(r.id) },
+                Alert.alert(t('deleteRecipient'), t('removeRecipient', { name: r.name }), [
+                  { text: t('cancel'), style: 'cancel' },
+                  { text: t('delete'), style: 'destructive', onPress: () => void remove(r.id) },
                 ])
               }
               className="p-2 active:opacity-60"
@@ -101,8 +104,7 @@ export default function RecipientsScreen() {
       )}
 
       <Text className="text-xs leading-5 text-slate-500">
-        A transfer to an address that is not saved here is treated as a first-time recipient and
-        flagged for review.
+        {t('recipientSafety')}
       </Text>
     </Screen>
   );
@@ -117,6 +119,7 @@ function RecipientForm({
   onSubmit: (name: string, address: string) => Promise<void>;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState(initial?.name ?? '');
   const [address, setAddress] = useState(initial?.address ?? '');
   const [busy, setBusy] = useState(false);
@@ -137,12 +140,12 @@ function RecipientForm({
   return (
     <View className="gap-3 rounded-2xl border border-blue-400/20 bg-slate-900 p-4">
       <Text className="text-sm font-semibold text-white">
-        {initial ? 'Edit recipient' : 'New recipient'}
+          {initial ? t('editRecipient') : t('newRecipient')}
       </Text>
       <TextInput
         value={name}
         onChangeText={setName}
-        placeholder="Name (e.g. Mum)"
+        placeholder={t('nameExample')}
         placeholderTextColor="#475569"
         className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100"
       />
@@ -162,7 +165,7 @@ function RecipientForm({
           onPress={onCancel}
           className="flex-1 items-center rounded-xl border border-slate-700 px-4 py-3 active:bg-slate-800"
         >
-          <Text className="text-sm font-semibold text-slate-300">Cancel</Text>
+          <Text className="text-sm font-semibold text-slate-300">{t('cancel')}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -171,7 +174,7 @@ function RecipientForm({
           className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 active:bg-blue-500 disabled:opacity-50"
         >
           {busy ? <ActivityIndicator color="#ffffff" size="small" /> : null}
-          <Text className="text-sm font-bold text-white">Save</Text>
+          <Text className="text-sm font-bold text-white">{t('save')}</Text>
         </Pressable>
       </View>
     </View>
