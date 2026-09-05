@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, TextInput, View } from 'react-nati
 import { Text } from '@/components/translated-text';
 
 import { AppPage } from '@/components/app-page';
+import { BudgetChat } from '@/components/budget/budget-chat';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useI18n } from '@/lib/i18n/i18n-context';
 import { useRecipients, type Recipient } from '@/lib/recipients/use-recipients';
@@ -68,6 +69,36 @@ export default function BudgetPlannerScreen() {
   const [pendingRecurringDeleteId, setPendingRecurringDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(null);
   const walletAddress = session?.walletAddress;
+
+  const applyChatValues = useCallback((values: {
+    salary?: string;
+    otherIncome?: string;
+    rent?: string;
+    food?: string;
+    utilities?: string;
+    transport?: string;
+    debt?: string;
+    otherEssentials?: string;
+    savings?: string;
+    supportAmount?: string;
+    asset?: Asset;
+    frequency?: Frequency;
+    recipient?: Recipient | null;
+  }) => {
+    if (values.salary) setSalary(values.salary);
+    if (values.otherIncome) setOtherIncome(values.otherIncome);
+    if (values.rent) setRent(values.rent);
+    if (values.food) setFood(values.food);
+    if (values.utilities) setUtilities(values.utilities);
+    if (values.transport) setTransport(values.transport);
+    if (values.debt) setDebt(values.debt);
+    if (values.otherEssentials) setOtherEssentials(values.otherEssentials);
+    if (values.savings) setSavings(values.savings);
+    if (values.supportAmount) setSupportAmount(values.supportAmount);
+    if (values.asset) setAsset(values.asset);
+    if (values.frequency) setFrequency(values.frequency);
+    if (values.recipient) setRecipient(values.recipient);
+  }, []);
 
   const loadSavedPlans = useCallback(async () => {
     if (!walletAddress) return;
@@ -243,6 +274,13 @@ export default function BudgetPlannerScreen() {
   return (
     <AppPage title={t('remitPlan')} subtitle={t('remitPlanSubtitle')}>
       {selectedModeHeader}
+      <View className="gap-3 rounded-2xl border border-blue-400/20 bg-blue-400/5 p-5">
+        <BudgetChat recipients={recipients} onApply={applyChatValues} />
+        <Text className="text-xs leading-5 text-slate-500">
+          The assistant only fills draft fields. The planner calculates affordability locally, and
+          nothing is saved until you review and confirm it.
+        </Text>
+      </View>
       <Section title="Planning asset" detail="Use one asset for all budget inputs so affordability math stays meaningful.">
         <View className="flex-row gap-2">
           {(['USDC', 'SUI'] as Asset[]).map((item) => <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: asset === item }} onPress={() => setAsset(item)} className={`flex-1 rounded-xl border px-3 py-3 ${asset === item ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-950/50'}`}><Text className={`text-center text-sm font-semibold ${asset === item ? 'text-blue-300' : 'text-slate-300'}`}>{item}</Text></Pressable>)}
