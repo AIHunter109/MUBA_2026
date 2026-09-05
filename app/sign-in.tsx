@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Text } from '@/components/translated-text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/lib/auth/auth-context';

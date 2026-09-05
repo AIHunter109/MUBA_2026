@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { isValidSuiAddress } from '@mysten/sui/utils';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, TextInput, View } from 'react-native';
+import { Text } from '@/components/translated-text';
 
 import { IntentReviewCard } from '@/components/intent-review';
 import { Screen } from '@/components/screen';

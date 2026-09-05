@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, useWindowDimensions, View } from 'react-native';
+import { Text } from '@/components/translated-text';
 
 import { Screen } from '@/components/screen';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -133,7 +134,7 @@ function mergeTransactions(...ledgers: TransactionRecord[][]): TransactionRecord
 
 export default function HomeScreen() {
   const { session, signOut } = useAuth();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [balances, setBalances] = useState<BalanceRow[] | null>(null);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
@@ -310,7 +311,7 @@ export default function HomeScreen() {
           {transactions.length ? (
             <View className="gap-3">
               {transactions.slice(0, 3).map((transaction) => (
-                <TransactionRow key={transaction.digest} transaction={transaction} compact={isNarrow} />
+                <TransactionRow key={transaction.digest} transaction={transaction} compact={isNarrow} t={t} language={language} />
               ))}
             </View>
           ) : (
@@ -330,7 +331,7 @@ export default function HomeScreen() {
         {recurringRules.length ? (
           <View className="gap-3">
             {recurringRules.slice(0, 3).map((rule) => (
-              <UpcomingPaymentRow key={rule.id} rule={rule} />
+              <UpcomingPaymentRow key={rule.id} rule={rule} t={t} language={language} />
             ))}
           </View>
         ) : (
@@ -399,13 +400,13 @@ function shortAddress(address: string): string {
   return `${address.slice(0, 7)}...${address.slice(-4)}`;
 }
 
-function TransactionRow({ transaction, compact }: { transaction: TransactionRecord; compact: boolean }) {
+function TransactionRow({ transaction, compact, t, language }: { transaction: TransactionRecord; compact: boolean; t: (key: string, values?: Record<string, string>) => string; language: string }) {
   return (
     <View className="justify-between border-b border-slate-800 pb-3 last:border-b-0 last:pb-0" style={{ flexDirection: compact ? 'column' : 'row', alignItems: compact ? 'flex-start' : 'center', gap: compact ? 4 : 0 }}>
       <View className="min-w-0 flex-1 gap-0.5 pr-3">
-        <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>Sent to {transaction.recipientName ?? shortAddress(transaction.recipient)}</Text>
+        <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>{t('sentToRecipient', { recipient: transaction.recipientName ?? shortAddress(transaction.recipient) })}</Text>
         <Text className="text-xs text-slate-500">
-          {new Date(transaction.occurredAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          {new Date(transaction.occurredAt).toLocaleDateString(language, { month: 'short', day: 'numeric' })}
         </Text>
       </View>
       <Text className="text-sm font-bold text-white" numberOfLines={1}>
@@ -488,9 +489,9 @@ function MonthlySpendChart({ transactions, t }: { transactions: TransactionRecor
   );
 }
 
-function UpcomingPaymentRow({ rule }: { rule: RecurringRule }) {
+function UpcomingPaymentRow({ rule, t, language }: { rule: RecurringRule; t: (key: string, values?: Record<string, string>) => string; language: string }) {
   const nextDate = new Date(rule.nextTriggerAt);
-  const cadence = rule.frequency.charAt(0) + rule.frequency.slice(1).toLowerCase();
+  const cadence = t(rule.frequency.toLowerCase());
   return (
     <View className="flex-row items-center justify-between border-b border-slate-800 pb-3 last:border-b-0 last:pb-0">
       <View className="min-w-0 flex-1 gap-0.5 pr-3">
@@ -498,7 +499,7 @@ function UpcomingPaymentRow({ rule }: { rule: RecurringRule }) {
           {rule.recipientName}
         </Text>
         <Text className="text-xs text-slate-500">
-          {cadence} · Next {nextDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          {t('nextPayment', { frequency: cadence, date: nextDate.toLocaleDateString(language, { month: 'short', day: 'numeric' }) })}
         </Text>
       </View>
       <Text className="text-sm font-bold text-white" numberOfLines={1}>

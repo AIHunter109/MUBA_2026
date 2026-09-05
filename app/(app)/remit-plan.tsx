@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, TextInput, View } from 'react-native';
+import { Text } from '@/components/translated-text';
 
 import { AppPage } from '@/components/app-page';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useI18n } from '@/lib/i18n/i18n-context';
 import { useRecipients, type Recipient } from '@/lib/recipients/use-recipients';
 import { apiGet, apiPost } from '@/lib/sui/api';
 
@@ -43,6 +45,7 @@ function statusFor(remaining: number, income: number): { result: Result; explana
 
 export default function RemitPlanScreen() {
   const { session } = useAuth();
+  const { t } = useI18n();
   const { recipients } = useRecipients();
   const [salary, setSalary] = useState('');
   const [otherIncome, setOtherIncome] = useState('');
@@ -167,7 +170,7 @@ export default function RemitPlanScreen() {
   if (phase === 'review' || phase === 'saving') {
     const statusStyle = budget.result === 'Comfortable' ? 'text-emerald-300' : budget.result === 'Tight' ? 'text-amber-300' : 'text-red-300';
     return (
-      <AppPage title="Review RemitPlan" subtitle="Check the complete budget before confirming a recurring remittance.">
+      <AppPage title={t('reviewRemitPlan')} subtitle="Check the complete budget before confirming a recurring remittance.">
         <View className="gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
           <SummaryRow label="Monthly income" value={`${displayAmount(budget.income)} ${asset}`} />
           <SummaryRow label="Essential expenses" value={`−${displayAmount(budget.essentials)} ${asset}`} />
@@ -178,7 +181,7 @@ export default function RemitPlanScreen() {
           </View>
         </View>
         <View className="gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-          <Text className="text-xs font-semibold uppercase tracking-widest text-slate-500">Budget result</Text>
+          <Text className="text-xs font-semibold uppercase tracking-widest text-slate-500">{t('budgetResult')}</Text>
           <Text className={`text-xl font-bold ${statusStyle}`}>{budget.result}</Text>
           <Text className="text-sm leading-5 text-slate-400">{budget.explanation}</Text>
         </View>
@@ -201,21 +204,21 @@ export default function RemitPlanScreen() {
   const planSwitcher = (
     <View className="gap-2">
       <Pressable accessibilityRole="button" accessibilityState={{ selected: viewMode === 'create' }} onPress={() => setViewMode('create')} className={`flex-1 rounded-xl border px-3 py-3 ${viewMode === 'create' ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-900/70'}`}>
-        <Text className={`text-center font-semibold ${viewMode === 'create' ? 'text-blue-300' : 'text-slate-300'}`}>Create plan</Text>
+        <Text className={`text-center font-semibold ${viewMode === 'create' ? 'text-blue-300' : 'text-slate-300'}`}>{t('createPlan')}</Text>
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityState={{ selected: viewMode === 'plans' }} onPress={() => setViewMode('plans')} className={`flex-1 rounded-xl border px-3 py-3 ${viewMode === 'plans' ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-900/70'}`}>
-        <Text className={`text-center font-semibold ${viewMode === 'plans' ? 'text-blue-300' : 'text-slate-300'}`}>Review plans</Text>
+        <Text className={`text-center font-semibold ${viewMode === 'plans' ? 'text-blue-300' : 'text-slate-300'}`}>{t('reviewPlans')}</Text>
       </Pressable>
     </View>
   );
-  const selectedModeHeader = <View className="flex-row items-center justify-between rounded-xl border border-blue-400/20 bg-blue-400/10 px-4 py-3"><Text className="font-semibold text-blue-200">{viewMode === 'create' ? 'Create plan' : 'Review plans'}</Text><Pressable accessibilityRole="button" onPress={() => setViewMode(null)} className="rounded-lg border border-blue-300/30 px-3 py-1.5"><Text className="text-xs font-semibold text-blue-200">Cancel</Text></Pressable></View>;
+  const selectedModeHeader = <View className="flex-row items-center justify-between rounded-xl border border-blue-400/20 bg-blue-400/10 px-4 py-3"><Text className="font-semibold text-blue-200">{viewMode === 'create' ? t('createPlan') : t('reviewPlans')}</Text><Pressable accessibilityRole="button" onPress={() => setViewMode(null)} className="rounded-lg border border-blue-300/30 px-3 py-1.5"><Text className="text-xs font-semibold text-blue-200">{t('cancel')}</Text></Pressable></View>;
 
   if (viewMode === null) {
     return (
-      <AppPage title="RemitPlan" subtitle="Choose what you would like to do.">
+      <AppPage title={t('remitPlan')} subtitle={t('guardianChoose')}>
         <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-          <Text className="text-base font-bold text-white">RemitPlan</Text>
-          <Text className="text-sm leading-5 text-slate-400">Create a new recurring family-support budget, or review plans you have already confirmed.</Text>
+          <Text className="text-base font-bold text-white">{t('remitPlan')}</Text>
+          <Text className="text-sm leading-5 text-slate-400">{t('planChoose')}</Text>
           {planSwitcher}
         </View>
       </AppPage>
@@ -237,7 +240,7 @@ export default function RemitPlanScreen() {
   }
 
   return (
-    <AppPage title="RemitPlan" subtitle="Plan family support around your real monthly budget before setting up a recurring remittance.">
+    <AppPage title={t('remitPlan')} subtitle={t('remitPlanSubtitle')}>
       {selectedModeHeader}
       <Section title="Planning asset" detail="Use one asset for all budget inputs so affordability math stays meaningful.">
         <View className="flex-row gap-2">
@@ -245,35 +248,35 @@ export default function RemitPlanScreen() {
         </View>
         <Text className="text-xs leading-5 text-slate-500">RemitPlan does not convert live exchange rates. Enter income and costs in the asset you select.</Text>
       </Section>
-      <Section title="Monthly income" detail="Enter salary and other regular income.">
-        <MoneyInput label="Salary" asset={asset} value={salary} onChangeText={setSalary} />
-        <MoneyInput label="Other regular income" asset={asset} value={otherIncome} onChangeText={setOtherIncome} />
+      <Section title={t('monthlyIncome')} detail="Enter salary and other regular income.">
+        <MoneyInput label={t('salary')} asset={asset} value={salary} onChangeText={setSalary} />
+        <MoneyInput label={t('otherIncome')} asset={asset} value={otherIncome} onChangeText={setOtherIncome} />
       </Section>
-      <Section title="Essential expenses" detail="Monthly needs that should be covered first.">
-        <MoneyInput label="Rent / housing" asset={asset} value={rent} onChangeText={setRent} />
-        <MoneyInput label="Food" asset={asset} value={food} onChangeText={setFood} />
-        <MoneyInput label="Utilities" asset={asset} value={utilities} onChangeText={setUtilities} />
-        <MoneyInput label="Transportation" asset={asset} value={transport} onChangeText={setTransport} />
-        <MoneyInput label="Debt / minimum payments" asset={asset} value={debt} onChangeText={setDebt} />
-        <MoneyInput label="Other essentials" asset={asset} value={otherEssentials} onChangeText={setOtherEssentials} />
+      <Section title={t('essentialExpenses')} detail="Monthly needs that should be covered first.">
+        <MoneyInput label={t('rent')} asset={asset} value={rent} onChangeText={setRent} />
+        <MoneyInput label={t('food')} asset={asset} value={food} onChangeText={setFood} />
+        <MoneyInput label={t('utilities')} asset={asset} value={utilities} onChangeText={setUtilities} />
+        <MoneyInput label={t('transportation')} asset={asset} value={transport} onChangeText={setTransport} />
+        <MoneyInput label={t('debt')} asset={asset} value={debt} onChangeText={setDebt} />
+        <MoneyInput label={t('otherEssentials')} asset={asset} value={otherEssentials} onChangeText={setOtherEssentials} />
       </Section>
-      <Section title="Savings target" detail="The amount you want to save every month.">
-        <MoneyInput label="Monthly savings" asset={asset} value={savings} onChangeText={setSavings} />
+      <Section title={t('savingsTarget')} detail="The amount you want to save every month.">
+        <MoneyInput label={t('monthlySavings')} asset={asset} value={savings} onChangeText={setSavings} />
       </Section>
-      <Section title="Planned family support" detail="Choose a saved recipient and recurring amount.">
-        {recipients.length ? <View className="flex-row flex-wrap gap-2">{recipients.map((item) => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: recipient?.id === item.id }} onPress={() => setRecipient(item)} className={`rounded-xl border px-3 py-2.5 ${recipient?.id === item.id ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-950/50'}`}><Text className={`text-sm font-semibold ${recipient?.id === item.id ? 'text-blue-300' : 'text-slate-300'}`}>{item.name}</Text></Pressable>)}</View> : <Text className="text-sm leading-5 text-amber-200">Save a recipient first, then return here to set up family support.</Text>}
-        <MoneyInput label="Remittance amount" asset={asset} value={supportAmount} onChangeText={setSupportAmount} />
+      <Section title={t('plannedFamilySupport')} detail="Choose a saved recipient and recurring amount.">
+        {recipients.length ? <View className="flex-row flex-wrap gap-2">{recipients.map((item) => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: recipient?.id === item.id }} onPress={() => setRecipient(item)} className={`rounded-xl border px-3 py-2.5 ${recipient?.id === item.id ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-950/50'}`}><Text className={`text-sm font-semibold ${recipient?.id === item.id ? 'text-blue-300' : 'text-slate-300'}`}>{item.name}</Text></Pressable>)}</View> : <Text className="text-sm leading-5 text-amber-200">{t('recipientFirst')}</Text>}
+        <MoneyInput label={t('remittanceAmount')} asset={asset} value={supportAmount} onChangeText={setSupportAmount} />
         <View className="flex-row flex-wrap gap-2">{FREQUENCIES.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: frequency === item.value }} onPress={() => setFrequency(item.value)} className={`rounded-xl border px-3 py-2.5 ${frequency === item.value ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-950/50'}`}><Text className={`text-sm font-semibold ${frequency === item.value ? 'text-blue-300' : 'text-slate-300'}`}>{item.label}</Text></Pressable>)}</View>
       </Section>
       <View className="gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-        <Text className="text-xs font-semibold uppercase tracking-widest text-slate-500">Affordability check</Text>
+        <Text className="text-xs font-semibold uppercase tracking-widest text-slate-500">{t('affordabilityCheck')}</Text>
         <Text className="text-2xl font-bold text-white">{displayAmount(budget.remaining)} {asset}</Text>
         <Text className="text-sm text-slate-400">Estimated remaining monthly balance after income − essentials − savings − family support.</Text>
       </View>
       {error ? <Text className="text-sm text-red-400">{error}</Text> : null}
       <Pressable accessibilityRole="button" onPress={review} className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-4 active:bg-blue-500">
         <Ionicons name="shield-checkmark-outline" size={19} color="#ffffff" />
-        <Text className="text-base font-bold text-white">Review budget</Text>
+        <Text className="text-base font-bold text-white">{t('reviewBudget')}</Text>
       </Pressable>
     </AppPage>
   );
