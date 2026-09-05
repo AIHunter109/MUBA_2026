@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -820,9 +820,15 @@ function Composer({
 }) {
   const [inputHeight, setInputHeight] = useState(COMPOSER_MIN_HEIGHT);
 
-  useEffect(() => {
-    if (value === '') setInputHeight(COMPOSER_MIN_HEIGHT);
-  }, [value]);
+  // Collapse back to single-line height once the field is cleared (e.g. after
+  // sending). Adjusted during render, guarded against the previous value,
+  // rather than in a useEffect - see the identical pattern in ManualSheet.
+  const [wasEmpty, setWasEmpty] = useState(value === '');
+  const isEmpty = value === '';
+  if (isEmpty !== wasEmpty) {
+    setWasEmpty(isEmpty);
+    if (isEmpty) setInputHeight(COMPOSER_MIN_HEIGHT);
+  }
 
   return (
     <View className="gap-2 border-t border-slate-800 bg-slate-950 px-3 pb-2 pt-3">
