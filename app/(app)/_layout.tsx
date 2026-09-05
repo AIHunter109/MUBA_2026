@@ -17,7 +17,7 @@ export default function AppLayout() {
     return <Redirect href="/sign-in" />;
   }
 
-  // Android/iOS bottom bars cap out around 5 items, so RemitPlan, Guardians,
+  // Android/iOS bottom bars cap out around 5 items, so Budget Planner, Guardians,
   // and Payment policies aren't tabs here - they're reached from the
   // Settings tab instead (see app/(app)/settings/_layout.tsx). The web
   // sidebar/bottom-bar has room to link to them directly - see _layout.web.tsx.

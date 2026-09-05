@@ -19,7 +19,7 @@ function FeatureLink({
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   detail: string;
-  href: '/(app)/settings/remit-plan' | '/(app)/settings/guardians' | '/(app)/settings/payment-policies';
+  href: '/(app)/settings/budget-planner' | '/(app)/settings/guardians' | '/(app)/settings/payment-policies';
   actionLabel: string;
 }) {
   return (
@@ -129,10 +129,10 @@ export default function SettingsScreen() {
             an additional, always-available way in. */}
         <FeatureLink
           icon="calculator-outline"
-          title="RemitPlan"
+          title="Budget Planner"
           detail="Build a monthly budget and set up a recurring remittance from it."
-          href="/(app)/settings/remit-plan"
-          actionLabel="Open RemitPlan"
+          href="/(app)/settings/budget-planner"
+          actionLabel="Open Budget Planner"
         />
         <FeatureLink
           icon="shield-checkmark-outline"
