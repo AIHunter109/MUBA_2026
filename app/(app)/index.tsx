@@ -34,6 +34,7 @@ type StoredTransaction = {
   asset: 'USDC' | 'SUI';
   status: 'success';
   occurredAt: string;
+  direction: 'SENT' | 'RECEIVED';
 };
 type RecurringRule = {
   id: string;
@@ -115,6 +116,7 @@ async function fetchStoredTransactions(address: string): Promise<TransactionReco
       decimals: coin.decimals,
       occurredAt: transaction.occurredAt,
       status: 'success',
+      direction: transaction.direction,
     };
   });
 }
@@ -271,7 +273,9 @@ export default function HomeScreen() {
   );
   const usdcBalance = displayBalances.find((row) => row.symbol === USDC_COIN.symbol);
   const suiBalance = displayBalances.find((row) => row.symbol === SUI_COIN.symbol);
-  const monthTransactions = transactions.filter((item) => isInCurrentMonth(item.occurredAt));
+  // Spending is what left the wallet - a received transfer is not a spend, so
+  // it stays out of this chart even though it still shows in the activity list.
+  const monthTransactions = transactions.filter((item) => item.direction !== 'RECEIVED' && isInCurrentMonth(item.occurredAt));
   const isNarrow = width < 380;
   const hasSidebar = width >= 1024;
   const hasTwoColumnSpace = width >= 1080;
@@ -491,16 +495,17 @@ function shortAddress(address: string): string {
 }
 
 function TransactionRow({ transaction, compact, t, language }: { transaction: TransactionRecord; compact: boolean; t: (key: string, values?: Record<string, string>) => string; language: string }) {
+  const received = transaction.direction === 'RECEIVED';
   return (
     <View className="justify-between border-b border-slate-800 pb-3 last:border-b-0 last:pb-0" style={{ flexDirection: compact ? 'column' : 'row', alignItems: compact ? 'flex-start' : 'center', gap: compact ? 4 : 0 }}>
       <View className="min-w-0 flex-1 gap-0.5 pr-3">
-        <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>{t('sentToRecipient', { recipient: transaction.recipientName ?? shortAddress(transaction.recipient) })}</Text>
+        <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>{t(received ? 'receivedFromRecipient' : 'sentToRecipient', { recipient: transaction.recipientName ?? shortAddress(transaction.recipient) })}</Text>
         <Text className="text-xs text-slate-500">
           {new Date(transaction.occurredAt).toLocaleDateString(language, { month: 'short', day: 'numeric' })}
         </Text>
       </View>
-      <Text className="text-sm font-bold text-white" numberOfLines={1}>
-        −{fromBaseUnits(BigInt(transaction.amountBaseUnits), transaction.decimals)} {transaction.symbol}
+      <Text className={`text-sm font-bold ${received ? 'text-emerald-400' : 'text-white'}`} numberOfLines={1}>
+        {received ? '+' : '-'}{fromBaseUnits(BigInt(transaction.amountBaseUnits), transaction.decimals)} {transaction.symbol}
       </Text>
     </View>
   );

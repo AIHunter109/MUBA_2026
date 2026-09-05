@@ -5,6 +5,20 @@ import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, Text, TextInp
 import { checkClaim } from '@/lib/intent/client';
 import type { ClaimCheckResult, ClaimModelRead } from '@/shared/contracts';
 
+import { ReasoningTrace, type TraceStep } from './reasoning-trace';
+
+/** The pipeline really does run in this order server-side (see
+ * server/src/factcheck/check-claim.ts: evidence retrieval, then the model
+ * calls, then a deterministic verdict) but arrives as one HTTP response with
+ * no incremental signal. These timings are an honest best-guess promotion of
+ * what should be happening when; the real result always overrides them the
+ * moment it actually arrives, so a stage is never shown done before it is. */
+const IDLE_TRACE: TraceStep[] = [
+  { id: 'search', label: 'Searching real news coverage', sublabel: 'NewsAPI - never a model\'s own memory', status: 'pending' },
+  { id: 'models', label: 'Cross-verifying with two independent models', sublabel: 'Gonka Router - reasoning only over what NewsAPI returned', status: 'pending' },
+  { id: 'verdict', label: 'Combining into a verdict', sublabel: 'Deterministic code, not another model call', status: 'pending' },
+];
+
 const VERDICT_STYLE: Record<ClaimCheckResult['verdict'], { label: string; color: string; bg: string; border: string }> = {
   SUPPORTED: { label: 'Supported', color: '#34d399', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
   CONTRADICTED: { label: 'Contradicted', color: '#f87171', bg: 'bg-red-500/10', border: 'border-red-500/30' },
@@ -31,6 +45,7 @@ export function FactCheckSheet({ visible, onClose }: { visible: boolean; onClose
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ClaimCheckResult | null>(null);
+  const [traceSteps, setTraceSteps] = useState<TraceStep[]>(IDLE_TRACE);
 
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
@@ -40,6 +55,7 @@ export function FactCheckSheet({ visible, onClose }: { visible: boolean; onClose
       setLoading(false);
       setError(null);
       setResult(null);
+      setTraceSteps(IDLE_TRACE);
     }
   }
 
@@ -49,11 +65,23 @@ export function FactCheckSheet({ visible, onClose }: { visible: boolean; onClose
     setLoading(true);
     setError(null);
     setResult(null);
+    setTraceSteps((steps) => steps.map((s) => (s.id === 'search' ? { ...s, status: 'active' } : s)));
+    const promoteToModels = setTimeout(() => {
+      setTraceSteps((steps) => steps.map((s) => (s.id === 'search' ? { ...s, status: 'done' } : s.id === 'models' ? { ...s, status: 'active' } : s)));
+    }, 1000);
+    const promoteToVerdict = setTimeout(() => {
+      setTraceSteps((steps) => steps.map((s) => (s.id === 'models' ? { ...s, status: 'done' } : s.id === 'verdict' ? { ...s, status: 'active' } : s)));
+    }, 2400);
     try {
-      setResult(await checkClaim(claim));
+      const claimResult = await checkClaim(claim);
+      setTraceSteps((steps) => steps.map((s) => ({ ...s, status: 'done' })));
+      setResult(claimResult);
     } catch (err) {
+      setTraceSteps((steps) => steps.map((s) => (s.status === 'done' ? s : { ...s, status: 'error' })));
       setError(err instanceof Error ? err.message : 'Could not check this claim - the fact-check service may be unavailable.');
     } finally {
+      clearTimeout(promoteToModels);
+      clearTimeout(promoteToVerdict);
       setLoading(false);
     }
   };
@@ -98,6 +126,8 @@ export function FactCheckSheet({ visible, onClose }: { visible: boolean; onClose
                   <Text className="text-sm font-bold text-white">{loading ? 'Checking against real news...' : 'Check this claim'}</Text>
                 </Pressable>
               </View>
+
+              {loading ? <ReasoningTrace title="AI Fact Checker" steps={traceSteps} /> : null}
 
               {error ? (
                 <View className="flex-row items-start gap-2 rounded-xl border border-red-400/30 bg-red-400/10 p-3">

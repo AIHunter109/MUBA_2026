@@ -14,6 +14,11 @@ export type TransactionRecord = {
   decimals: number;
   occurredAt: string;
   status: 'success';
+  // This device's own local ledger only ever records transfers it itself
+  // submitted, so entries written here are always 'SENT'. The field exists
+  // so this type can also carry server-fetched transactions, which may be
+  // 'RECEIVED' mirrors of another RemitGuard user's send.
+  direction?: 'SENT' | 'RECEIVED';
 };
 
 function canUseWebStorage(): boolean {

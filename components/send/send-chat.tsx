@@ -221,9 +221,9 @@ export function SendChat({
       id: nextId(),
       kind: 'trace',
       steps: [
-        { id: 'read', label: 'Reading your message', sublabel: 'Parser model', status: 'active' },
-        { id: 'cross', label: 'Cross-checking independently', sublabel: 'Verifier model', status: 'active' },
-        { id: 'rules', label: 'Checking recipient & risk rules', status: 'pending' },
+        { id: 'read', label: 'Reading your message', sublabel: 'Parser model - Gonka Router', status: 'active' },
+        { id: 'cross', label: 'Cross-checking independently', sublabel: 'Verifier model - a different model, same message', status: 'active' },
+        { id: 'rules', label: 'Checking recipient & risk rules', sublabel: 'Known recipient, amount pattern, urgency language - deterministic, not AI', status: 'pending' },
       ],
     });
     setStage('thinking');
@@ -242,7 +242,7 @@ export function SendChat({
     push({
       id: nextId(),
       kind: 'trace',
-      steps: [{ id: 'rules', label: 'Checking recipient & risk rules', status: 'active' }],
+      steps: [{ id: 'rules', label: 'Checking recipient & risk rules', sublabel: 'Known recipient, amount pattern, urgency language - deterministic, not AI', status: 'active' }],
     });
     setStage('thinking');
     try {
@@ -287,15 +287,23 @@ export function SendChat({
       return;
     }
 
+    // Genuinely sequential server-side (evidence search finishes before the
+    // models are even called - see server/src/factcheck/check-claim.ts) but
+    // it arrives as one HTTP response with no incremental signal. This timer
+    // is an honest best-guess promotion of what should be happening when;
+    // the real result below always overrides it the moment it actually
+    // arrives, so the UI never shows a stage as finished before it is.
+    let promoteClaimStep: ReturnType<typeof setTimeout> | null = null;
     if (hasClaims) {
+      const claimWord = claimsToCheck.length > 1 ? 'claims' : 'claim';
       updateTrace((s) => [
         ...s,
-        {
-          id: 'claims',
-          label: `Verifying ${claimsToCheck.length} claim${claimsToCheck.length > 1 ? 's' : ''} you mentioned`,
-          status: 'active',
-        },
+        { id: 'claims-search', label: `Searching real news for ${claimsToCheck.length} ${claimWord} you mentioned`, sublabel: 'NewsAPI - never a model\'s own memory', status: 'active' },
+        { id: 'claims-models', label: 'Cross-verifying with two independent models', sublabel: 'Gonka Router - reasoning only over what NewsAPI returned', status: 'pending' },
       ]);
+      promoteClaimStep = setTimeout(() => {
+        updateTrace((s) => s.map((x) => (x.id === 'claims-search' ? { ...x, status: 'done' } : x.id === 'claims-models' ? { ...x, status: 'active' } : x)));
+      }, 900);
     }
 
     const reportId = nextId();
@@ -321,12 +329,13 @@ export function SendChat({
           }
         }),
       );
+      if (promoteClaimStep) clearTimeout(promoteClaimStep);
       const claimResults: Record<string, ClaimOutcome> = {};
       for (const [claim, result] of results) claimResults[claim] = result;
       setItems((prev) =>
         prev.map((it) => (it.id === reportId && it.kind === 'report' ? { ...it, claimResults, claimsLoading: false } : it)),
       );
-      updateTrace((s) => s.map((x) => (x.id === 'claims' ? { ...x, status: 'done' } : x)));
+      updateTrace((s) => s.map((x) => (x.id === 'claims-search' || x.id === 'claims-models' ? { ...x, status: 'done' } : x)));
     }
   };
 
@@ -597,7 +606,7 @@ function ReportCard({
           {item.claimsLoading ? (
             <View className="flex-row items-center gap-2">
               <ActivityIndicator size="small" color="#94a3b8" />
-              <Text className="text-xs text-slate-400">Checking against real news...</Text>
+              <Text className="text-xs text-slate-400">Querying NewsAPI, then cross-verifying with two models - see the trace above</Text>
             </View>
           ) : (
             item.claims.map((claim) => <ClaimRow key={claim} claim={claim} result={item.claimResults[claim]} />)

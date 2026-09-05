@@ -17,6 +17,7 @@ export type TransactionDto = {
   asset: 'USDC' | 'SUI';
   status: 'success';
   occurredAt: string;
+  direction: 'SENT' | 'RECEIVED';
 };
 
 function validateAmount(amount: string): string {
@@ -62,7 +63,7 @@ export async function recordSettledTransaction(input: {
   });
 
   const row = await prisma.transaction.upsert({
-    where: { digest: input.digest },
+    where: { userId_digest: { userId, digest: input.digest } },
     create: {
       userId,
       recipientId: recipient?.id,
@@ -72,9 +73,42 @@ export async function recordSettledTransaction(input: {
       status: 'success',
       digest: input.digest,
       network: input.network,
+      direction: 'SENT',
     },
     update: {},
   });
+
+  // Best-effort mirror: if the recipient address itself belongs to a
+  // RemitGuard user (an AuthIdentity already on file - we only look, never
+  // create one the way resolveUserId would), record a matching RECEIVED row
+  // in their own history so both sides of an in-app transfer see it. This
+  // only covers RemitGuard-to-RemitGuard transfers; money arriving from
+  // outside the app (another wallet, an exchange) is not detected here.
+  const receiverIdentity = await prisma.authIdentity.findUnique({
+    where: { provider_providerSub: { provider: 'wallet', providerSub: recipientAddress } },
+  });
+  if (receiverIdentity && receiverIdentity.userId !== userId) {
+    const senderAddress = normalizeSuiAddress(input.owner.trim());
+    const savedSenderContact = await prisma.recipient.findFirst({
+      where: { userId: receiverIdentity.userId, address: senderAddress },
+      select: { id: true },
+    });
+    await prisma.transaction.upsert({
+      where: { userId_digest: { userId: receiverIdentity.userId, digest: input.digest } },
+      create: {
+        userId: receiverIdentity.userId,
+        recipientId: savedSenderContact?.id,
+        recipientAddress: senderAddress,
+        amount,
+        asset,
+        status: 'success',
+        digest: input.digest,
+        network: input.network,
+        direction: 'RECEIVED',
+      },
+      update: {},
+    });
+  }
 
   return {
     digest: row.digest as string,
@@ -84,6 +118,7 @@ export async function recordSettledTransaction(input: {
     asset: row.asset as 'USDC' | 'SUI',
     status: 'success',
     occurredAt: row.createdAt.toISOString(),
+    direction: row.direction as 'SENT' | 'RECEIVED',
   };
 }
 
@@ -107,6 +142,7 @@ export async function listTransactions(owner: string): Promise<TransactionDto[]>
       asset: row.asset as 'USDC' | 'SUI',
       status: 'success' as const,
       occurredAt: row.createdAt.toISOString(),
+      direction: (row.direction === 'RECEIVED' ? 'RECEIVED' : 'SENT') as 'SENT' | 'RECEIVED',
     }));
 }
 

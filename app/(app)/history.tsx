@@ -19,6 +19,7 @@ type StoredTransaction = {
   amount: string;
   asset: 'USDC' | 'SUI';
   occurredAt: string;
+  direction: 'SENT' | 'RECEIVED';
 };
 
 async function loadTransactions(owner: string): Promise<TransactionRecord[]> {
@@ -40,6 +41,7 @@ async function loadTransactions(owner: string): Promise<TransactionRecord[]> {
           decimals: coin.decimals,
           occurredAt: transaction.occurredAt,
           status: 'success' as const,
+          direction: transaction.direction,
         };
       }),
     )
@@ -93,15 +95,16 @@ export default function HistoryScreen() {
 
 function HistoryRow({ transaction, t, language }: { transaction: TransactionRecord; t: (key: string, values?: Record<string, string>) => string; language: string }) {
   const date = new Date(transaction.occurredAt);
-  const recipient = transaction.recipientName ?? (transaction.recipient ? `${transaction.recipient.slice(0, 8)}…${transaction.recipient.slice(-6)}` : 'Unknown recipient');
+  const received = transaction.direction === 'RECEIVED';
+  const counterparty = transaction.recipientName ?? (transaction.recipient ? `${transaction.recipient.slice(0, 8)}...${transaction.recipient.slice(-6)}` : (received ? 'Unknown sender' : 'Unknown recipient'));
   return (
     <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(explorerTxUrl(transaction.digest))} className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 active:bg-slate-800">
       <View className="flex-row items-center justify-between gap-3">
         <View className="min-w-0 flex-1">
-          <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>{t('sentToRecipient', { recipient })}</Text>
+          <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>{t(received ? 'receivedFromRecipient' : 'sentToRecipient', { recipient: counterparty })}</Text>
           <Text className="mt-1 text-xs text-slate-500">{date.toLocaleString(language, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</Text>
         </View>
-        <Text className="text-sm font-bold text-white">−{fromBaseUnits(BigInt(transaction.amountBaseUnits), transaction.decimals)} {transaction.symbol}</Text>
+        <Text className={`text-sm font-bold ${received ? 'text-emerald-400' : 'text-white'}`}>{received ? '+' : '-'}{fromBaseUnits(BigInt(transaction.amountBaseUnits), transaction.decimals)} {transaction.symbol}</Text>
       </View>
       <View className="flex-row items-center justify-between border-t border-slate-800 pt-3">
         <Text className="font-mono text-[10px] text-slate-500" numberOfLines={1}>{transaction.digest}</Text>

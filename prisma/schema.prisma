@@ -160,11 +160,17 @@ model Transaction {
   userId          String
   paymentIntentId String?        @unique
   recipientId     String?
+  // The other party's address: who the money went to on a SENT row, who it
+  // came from on a RECEIVED row.
   recipientAddress String?
   amount          Decimal
   asset           String
   status          String
-  digest          String?        @unique
+  // Same on-chain digest can now appear twice - once for the sender's SENT
+  // row, once for the receiver's mirrored RECEIVED row - so uniqueness moved
+  // from digest alone to (userId, digest).
+  digest          String?
+  direction       String         @default("SENT")
   network         String
   failureReason   String?
   createdAt       DateTime       @default(now())
@@ -173,6 +179,7 @@ model Transaction {
   paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
   recipient       Recipient?     @relation(fields: [recipientId], references: [id], onDelete: SetNull)
 
+  @@unique([userId, digest])
   @@index([userId, createdAt])
   @@index([userId, recipientId, createdAt])
 }

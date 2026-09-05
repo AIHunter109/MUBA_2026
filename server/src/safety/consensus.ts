@@ -137,13 +137,11 @@ export function assessIntent(
       detail: 'The message uses urgency or emergency framing. Scammers rely on time pressure.',
     });
   }
-  if (claims.length > 0) {
-    flags.push({
-      code: 'UNVERIFIED_CLAIMS',
-      severity: 'info',
-      detail: `You mentioned: "${claims.join('; ')}". RemitGuard's AI cannot verify real-world events or news - confirm this yourself (call the person, check a news source) before relying on it.`,
-    });
-  }
+  // Deliberately no flag here: `claims` below feeds the real NewsAPI-backed
+  // fact-check (evidence + two-model cross-check, shown in its own section
+  // once it runs) - stacking a generic "cannot verify" disclaimer on top of
+  // that, before the real check even runs, was redundant and read as if the
+  // AI had already given up on claims it was about to actually verify.
 
   const amount = merged.amount ?? 0;
   if (resolved && amount > config.highAmountThreshold) {
