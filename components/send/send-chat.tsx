@@ -257,13 +257,26 @@ export function SendChat({
 
   // --- shared continuation once a review comes back -----------------------
 
-  const settleReview = async (review: IntentReview) => {
+  const settleReview = async (rawReview: IntentReview) => {
+    // Defensive: never trust a network response's shape blindly. A dropped
+    // connection, a stale bundle talking to a newer server, or a proxy that
+    // truncates a slow response (Gonka calls can run 20+ seconds) could hand
+    // back something that is not quite a full IntentReview. Normalizing the
+    // array fields here means a shape mismatch degrades to "nothing flagged"
+    // instead of crashing the chat with a raw JS error like "claims is not
+    // iterable".
+    const review: IntentReview = {
+      ...rawReview,
+      flags: Array.isArray(rawReview.flags) ? rawReview.flags : [],
+      claims: Array.isArray(rawReview.claims) ? rawReview.claims : [],
+      modelReads: Array.isArray(rawReview.modelReads) ? rawReview.modelReads : [],
+    };
     reviewRef.current = review;
     updateTrace((s) => s.map((x) => (x.id === 'rules' ? x : { ...x, status: 'done' })));
     await delay(200);
     updateTrace((s) => s.map((x) => (x.id === 'rules' ? { ...x, status: 'done' } : x)));
 
-    if (review.status === 'cannot_execute') {
+    if (review.status === 'cannot_execute' || !review.plan) {
       if (review.flags.length > 0) {
         review.flags.forEach((f) => say(f.detail, 'warn'));
       } else {
@@ -323,7 +336,10 @@ export function SendChat({
       const results = await Promise.all(
         claimsToCheck.map(async (claim): Promise<[string, ClaimOutcome]> => {
           try {
-            return [claim, await checkClaim(claim)];
+            const raw = await checkClaim(claim);
+            // Defensive: never trust a network response's shape blindly - see
+            // the matching guard on `settleReview` above.
+            return [claim, { ...raw, evidence: Array.isArray(raw.evidence) ? raw.evidence : [], modelReads: Array.isArray(raw.modelReads) ? raw.modelReads : [] }];
           } catch {
             return [claim, { error: true }];
           }

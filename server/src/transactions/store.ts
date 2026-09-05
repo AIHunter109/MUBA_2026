@@ -1,7 +1,10 @@
+import type { SuiGrpcClient } from '@mysten/sui/grpc';
 import { isValidSuiAddress, normalizeSuiAddress } from '@mysten/sui/utils';
 
+import type { Environment } from '../config';
 import { prisma } from '../db';
 import { RecipientError, resolveUserId } from '../recipients/store';
+import { listOnChainReceivedTransfers } from './on-chain';
 
 export class TransactionError extends Error {
   constructor(message: string) {
@@ -122,7 +125,19 @@ export async function recordSettledTransaction(input: {
   };
 }
 
-export async function listTransactions(owner: string): Promise<TransactionDto[]> {
+/**
+ * `chain`, when given, adds a best-effort second source: real incoming
+ * transfers detected directly on Sui (see transactions/on-chain.ts), merged
+ * in alongside whatever this app itself recorded. This is what makes a
+ * transfer sent from outside RemitGuard entirely - another wallet, an
+ * exchange, or a friend running their own separate copy of this app with
+ * their own database - still show up. A chain-read failure never breaks the
+ * rest of the history; it just falls back to the app's own records.
+ */
+export async function listTransactions(
+  owner: string,
+  chain?: { client: SuiGrpcClient; environment: Environment },
+): Promise<TransactionDto[]> {
   const userId = await resolveUserId(owner);
   const [rows, recipients] = await Promise.all([prisma.transaction.findMany({
     where: { userId, status: 'success' },
@@ -132,7 +147,7 @@ export async function listTransactions(owner: string): Promise<TransactionDto[]>
   }), prisma.recipient.findMany({ where: { userId }, select: { address: true, name: true } })]);
   const namesByAddress = new Map(recipients.map((recipient) => [recipient.address, recipient.name]));
 
-  return rows
+  const dbTransactions: TransactionDto[] = rows
     .filter((row): row is typeof row & { digest: string } => Boolean(row.digest))
     .map((row) => ({
       digest: row.digest,
@@ -144,6 +159,32 @@ export async function listTransactions(owner: string): Promise<TransactionDto[]>
       occurredAt: row.createdAt.toISOString(),
       direction: (row.direction === 'RECEIVED' ? 'RECEIVED' : 'SENT') as 'SENT' | 'RECEIVED',
     }));
+
+  if (!chain) {
+    return dbTransactions;
+  }
+
+  const knownDigests = new Set(dbTransactions.map((t) => t.digest));
+  let onChainTransactions: TransactionDto[] = [];
+  try {
+    const transfers = await listOnChainReceivedTransfers(chain.client, chain.environment, owner);
+    onChainTransactions = transfers
+      .filter((t) => !knownDigests.has(t.digest))
+      .map((t) => ({
+        digest: t.digest,
+        recipient: t.from,
+        recipientName: namesByAddress.get(t.from),
+        amount: t.amount,
+        asset: t.asset,
+        status: 'success' as const,
+        occurredAt: t.occurredAt,
+        direction: 'RECEIVED' as const,
+      }));
+  } catch {
+    // The app's own recorded history must still load if the chain read fails.
+  }
+
+  return [...dbTransactions, ...onChainTransactions].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
 }
 
 export function isTransactionStoreError(error: unknown): error is TransactionError | RecipientError {

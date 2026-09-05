@@ -218,7 +218,7 @@ const server = createServer((request, response) => {
       writeApiError(response, 400, 'OWNER_REQUIRED', 'owner is required', requestId);
       return;
     }
-    listTransactions(owner)
+    listTransactions(owner, { client: suiClient, environment })
       .then((transactions) => writeJson(response, 200, { transactions }, requestId))
       .catch((error: unknown) => writeTransactionError(response, error, requestId));
     return;

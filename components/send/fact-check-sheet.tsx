@@ -73,7 +73,14 @@ export function FactCheckSheet({ visible, onClose }: { visible: boolean; onClose
       setTraceSteps((steps) => steps.map((s) => (s.id === 'models' ? { ...s, status: 'done' } : s.id === 'verdict' ? { ...s, status: 'active' } : s)));
     }, 2400);
     try {
-      const claimResult = await checkClaim(claim);
+      const raw = await checkClaim(claim);
+      // Defensive: never trust a network response's shape blindly - see the
+      // matching guard in send-chat.tsx's settleReview for why.
+      const claimResult: ClaimCheckResult = {
+        ...raw,
+        evidence: Array.isArray(raw.evidence) ? raw.evidence : [],
+        modelReads: Array.isArray(raw.modelReads) ? raw.modelReads : [],
+      };
       setTraceSteps((steps) => steps.map((s) => ({ ...s, status: 'done' })));
       setResult(claimResult);
     } catch (err) {
