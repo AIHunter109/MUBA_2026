@@ -12,8 +12,9 @@ type Frequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 type Asset = 'USDC' | 'SUI';
 type Result = 'Comfortable' | 'Tight' | 'Over Budget';
 type Phase = 'edit' | 'review' | 'saving' | 'done';
-type ViewMode = 'create' | 'plans';
+type ViewMode = 'create' | 'plans' | null;
 type SavedPlan = { id: string; recipientName: string; income: string; essentials: string; savings: string; monthlySupport: string; remaining: string; asset: Asset; frequency: string; result: Result; explanation: string; createdAt: string };
+type RecurringPlan = { id: string; recipientName: string; amount: string; asset: Asset; frequency: string; nextTriggerAt: string };
 
 const FREQUENCIES: { value: Frequency; label: string; monthlyMultiplier: number }[] = [
   { value: 'WEEKLY', label: 'Weekly', monthlyMultiplier: 52 / 12 },
@@ -59,12 +60,20 @@ export default function RemitPlanScreen() {
   const [phase, setPhase] = useState<Phase>('edit');
   const [error, setError] = useState<string | null>(null);
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('create');
+  const [recurringPlans, setRecurringPlans] = useState<RecurringPlan[]>([]);
+  const [plansError, setPlansError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(null);
 
   const loadSavedPlans = useCallback(async () => {
     if (!session?.walletAddress) return;
-    const { plans } = await apiGet<{ plans: SavedPlan[] }>(`/v1/budget-plans?owner=${encodeURIComponent(session.walletAddress)}`).catch(() => ({ plans: [] }));
-    setSavedPlans(plans);
+    const owner = encodeURIComponent(session.walletAddress);
+    const [budgetResult, recurringResult] = await Promise.allSettled([
+      apiGet<{ plans: SavedPlan[] }>(`/v1/budget-plans?owner=${owner}`),
+      apiGet<{ rules: RecurringPlan[] }>(`/v1/recurring-rules?owner=${owner}`),
+    ]);
+    setSavedPlans(budgetResult.status === 'fulfilled' ? budgetResult.value.plans : []);
+    setRecurringPlans(recurringResult.status === 'fulfilled' ? recurringResult.value.rules : []);
+    setPlansError(budgetResult.status === 'rejected' && recurringResult.status === 'rejected' ? 'Could not load plans. Make sure the RemitGuard server is running, then try again.' : null);
   }, [session?.walletAddress]);
 
   useFocusEffect(useCallback(() => { void loadSavedPlans(); }, [loadSavedPlans]));
@@ -173,7 +182,7 @@ export default function RemitPlanScreen() {
   }
 
   const planSwitcher = (
-    <View className="flex-row gap-2">
+    <View className="gap-2">
       <Pressable accessibilityRole="button" accessibilityState={{ selected: viewMode === 'create' }} onPress={() => setViewMode('create')} className={`flex-1 rounded-xl border px-3 py-3 ${viewMode === 'create' ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-900/70'}`}>
         <Text className={`text-center font-semibold ${viewMode === 'create' ? 'text-blue-300' : 'text-slate-300'}`}>Create plan</Text>
       </Pressable>
@@ -183,11 +192,26 @@ export default function RemitPlanScreen() {
     </View>
   );
 
+  if (viewMode === null) {
+    return (
+      <AppPage title="RemitPlan" subtitle="Choose what you would like to do.">
+        <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+          <Text className="text-base font-bold text-white">RemitPlan</Text>
+          <Text className="text-sm leading-5 text-slate-400">Create a new recurring family-support budget, or review plans you have already confirmed.</Text>
+          {planSwitcher}
+        </View>
+      </AppPage>
+    );
+  }
+
   if (viewMode === 'plans') {
     return (
       <AppPage title="RemitPlan" subtitle="Review the budget plans you have confirmed.">
         {planSwitcher}
-        {savedPlans.length ? <View className="gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-5"><View className="flex-row items-center gap-2"><Ionicons name="clipboard-outline" size={19} color="#34d399" /><Text className="text-base font-bold text-white">Saved RemitPlans</Text></View>{savedPlans.map((plan) => <View key={plan.id} className="gap-2 border-t border-emerald-400/10 pt-3"><View className="flex-row items-center justify-between gap-3"><Text className="font-semibold text-slate-200">{plan.recipientName} · {plan.frequency.toLowerCase()}</Text><Text className={`text-sm font-bold ${plan.result === 'Comfortable' ? 'text-emerald-300' : plan.result === 'Tight' ? 'text-amber-300' : 'text-red-300'}`}>{plan.result}</Text></View><Text className="text-xs text-slate-400">Income {plan.income} − essentials {plan.essentials} − savings {plan.savings} − support {plan.monthlySupport} = <Text className="font-semibold text-slate-200">{plan.remaining} {plan.asset}</Text></Text><Text className="text-xs leading-5 text-slate-500">{plan.explanation}</Text></View>)}</View> : <View className="items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-6"><Ionicons name="clipboard-outline" size={28} color="#64748b" /><Text className="font-semibold text-slate-200">No saved plans yet</Text><Text className="text-center text-sm text-slate-500">Create and confirm a RemitPlan to review it here.</Text></View>}
+        {plansError ? <Text className="text-sm text-red-300">{plansError}</Text> : null}
+        {savedPlans.length ? <View className="gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-5"><View className="flex-row items-center gap-2"><Ionicons name="clipboard-outline" size={19} color="#34d399" /><Text className="text-base font-bold text-white">Budget plans</Text></View>{savedPlans.map((plan) => <View key={plan.id} className="gap-2 border-t border-emerald-400/10 pt-3"><View className="flex-row items-center justify-between gap-3"><Text className="font-semibold text-slate-200">{plan.recipientName} · {plan.frequency.toLowerCase()}</Text><Text className={`text-sm font-bold ${plan.result === 'Comfortable' ? 'text-emerald-300' : plan.result === 'Tight' ? 'text-amber-300' : 'text-red-300'}`}>{plan.result}</Text></View><Text className="text-xs text-slate-400">Income {plan.income} − essentials {plan.essentials} − savings {plan.savings} − support {plan.monthlySupport} = <Text className="font-semibold text-slate-200">{plan.remaining} {plan.asset}</Text></Text><Text className="text-xs leading-5 text-slate-500">{plan.explanation}</Text></View>)}</View> : null}
+        {recurringPlans.length ? <View className="gap-3 rounded-2xl border border-blue-400/20 bg-blue-400/5 p-5"><View className="flex-row items-center gap-2"><Ionicons name="calendar-outline" size={19} color="#60a5fa" /><Text className="text-base font-bold text-white">Recurring remittances</Text></View>{recurringPlans.map((plan) => <View key={plan.id} className="gap-1 border-t border-blue-400/10 pt-3"><Text className="font-semibold text-slate-200">{plan.recipientName} · {plan.amount} {plan.asset} · {plan.frequency.toLowerCase()}</Text><Text className="text-xs text-slate-500">Next payment: {new Date(plan.nextTriggerAt).toLocaleDateString()}</Text></View>)}</View> : null}
+        {!savedPlans.length && !recurringPlans.length && !plansError ? <View className="items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-6"><Ionicons name="clipboard-outline" size={28} color="#64748b" /><Text className="font-semibold text-slate-200">No saved plans yet</Text><Text className="text-center text-sm text-slate-500">Create and confirm a RemitPlan to review it here.</Text></View> : null}
       </AppPage>
     );
   }
