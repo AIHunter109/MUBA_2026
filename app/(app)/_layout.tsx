@@ -17,7 +17,10 @@ export default function AppLayout() {
     return <Redirect href="/sign-in" />;
   }
 
-  // Android's native bottom bar allows at most 5 visible tabs.
+  // Android/iOS bottom bars cap out around 5 items, so RemitPlan, Guardians,
+  // and Payment policies aren't tabs here - they're reached from the
+  // Settings tab instead (see app/(app)/settings/_layout.tsx). The web
+  // sidebar/bottom-bar has room to link to them directly - see _layout.web.tsx.
   return (
     <NativeTabs tintColor="#60a5fa">
       <NativeTabs.Trigger name="index">
@@ -40,9 +43,6 @@ export default function AppLayout() {
         <NativeTabs.Trigger.Label>{t('settings')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="gearshape.fill" src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="settings" />} />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="remit-plan" hidden />
-      <NativeTabs.Trigger name="guardians" hidden />
-      <NativeTabs.Trigger name="payment-policies" hidden />
     </NativeTabs>
   );
 }

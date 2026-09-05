@@ -10,7 +10,14 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 type NavItem = {
   label: string;
-  href: '/(app)' | '/(app)/send' | '/(app)/remit-plan' | '/(app)/guardians' | '/(app)/recipients' | '/(app)/history' | '/(app)/settings';
+  href:
+    | '/(app)'
+    | '/(app)/send'
+    | '/(app)/settings/remit-plan'
+    | '/(app)/settings/guardians'
+    | '/(app)/recipients'
+    | '/(app)/history'
+    | '/(app)/settings';
   icon: IconName;
 };
 
@@ -81,9 +88,9 @@ export default function AppLayoutWeb() {
   const { t } = useI18n();
   const { width } = useWindowDimensions();
   const nav: NavItem[] = [
-    { label: t('home'), href: '/(app)', icon: 'home-outline' }, { label: t('send'), href: '/(app)/send', icon: 'paper-plane-outline' }, { label: t('remitPlan'), href: '/(app)/remit-plan', icon: 'calculator-outline' }, { label: t('guardians'), href: '/(app)/guardians', icon: 'shield-checkmark-outline' }, { label: t('recipients'), href: '/(app)/recipients', icon: 'people-outline' }, { label: t('history'), href: '/(app)/history', icon: 'receipt-outline' }, { label: t('settings'), href: '/(app)/settings', icon: 'settings-outline' },
+    { label: t('home'), href: '/(app)', icon: 'home-outline' }, { label: t('send'), href: '/(app)/send', icon: 'paper-plane-outline' }, { label: t('remitPlan'), href: '/(app)/settings/remit-plan', icon: 'calculator-outline' }, { label: t('guardians'), href: '/(app)/settings/guardians', icon: 'shield-checkmark-outline' }, { label: t('recipients'), href: '/(app)/recipients', icon: 'people-outline' }, { label: t('history'), href: '/(app)/history', icon: 'receipt-outline' }, { label: t('settings'), href: '/(app)/settings', icon: 'settings-outline' },
   ];
-  const bottomNav = nav.filter((item) => ['/(app)', '/(app)/send', '/(app)/remit-plan', '/(app)/guardians', '/(app)/settings'].includes(item.href));
+  const bottomNav = nav.filter((item) => ['/(app)', '/(app)/send', '/(app)/settings/remit-plan', '/(app)/settings/guardians', '/(app)/settings'].includes(item.href));
 
   if (isLoading) {
     return null;
