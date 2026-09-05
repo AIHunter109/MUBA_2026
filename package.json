@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "build": "expo export -p web",
     "start": "expo start",
     "server": "npm run db:deploy && tsx --env-file-if-exists=server/.env server/src/index.ts",
     "db:deploy": "prisma migrate deploy",
@@ -67,6 +68,7 @@
     "eslint": "^9.25.0",
     "eslint-config-expo": "~57.0.2",
     "postcss": "^8.5.26",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3"
   },
