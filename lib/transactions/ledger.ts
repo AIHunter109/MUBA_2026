@@ -7,6 +7,7 @@ export type TransactionRecord = {
   id: string;
   digest: string;
   recipient: string;
+  recipientName?: string;
   amountBaseUnits: string;
   coinType: string;
   symbol: string;

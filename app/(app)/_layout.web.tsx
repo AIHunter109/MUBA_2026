@@ -9,7 +9,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 type NavItem = {
   label: string;
-  href: '/(app)' | '/(app)/send' | '/(app)/recipients' | '/(app)/history' | '/(app)/settings';
+  href: '/(app)' | '/(app)/send' | '/(app)/remit-plan' | '/(app)/guardians' | '/(app)/recipients' | '/(app)/history' | '/(app)/settings';
   icon: IconName;
 };
 
@@ -80,8 +80,9 @@ export default function AppLayoutWeb() {
   const { t } = useI18n();
   const { width } = useWindowDimensions();
   const nav: NavItem[] = [
-    { label: t('home'), href: '/(app)', icon: 'home-outline' }, { label: t('send'), href: '/(app)/send', icon: 'paper-plane-outline' }, { label: t('recipients'), href: '/(app)/recipients', icon: 'people-outline' }, { label: t('history'), href: '/(app)/history', icon: 'receipt-outline' }, { label: t('settings'), href: '/(app)/settings', icon: 'settings-outline' },
+    { label: t('home'), href: '/(app)', icon: 'home-outline' }, { label: t('send'), href: '/(app)/send', icon: 'paper-plane-outline' }, { label: 'RemitPlan', href: '/(app)/remit-plan', icon: 'calculator-outline' }, { label: 'Guardians', href: '/(app)/guardians', icon: 'shield-checkmark-outline' }, { label: t('recipients'), href: '/(app)/recipients', icon: 'people-outline' }, { label: t('history'), href: '/(app)/history', icon: 'receipt-outline' }, { label: t('settings'), href: '/(app)/settings', icon: 'settings-outline' },
   ];
+  const bottomNav = nav.filter((item) => ['/(app)', '/(app)/send', '/(app)/remit-plan', '/(app)/guardians', '/(app)/settings'].includes(item.href));
 
   if (isLoading) {
     return null;
@@ -123,7 +124,7 @@ export default function AppLayoutWeb() {
 
       {!isSidebar ? (
         <View className="flex-row items-stretch gap-1 border-t border-slate-800 bg-slate-950 px-1.5 pb-2 pt-1.5">
-          {nav.map((item) => (
+          {bottomNav.map((item) => (
             <NavLink key={item.href} item={item} variant="bottom" />
           ))}
         </View>

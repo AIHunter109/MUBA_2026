@@ -11,7 +11,7 @@ Rules:
 - "recipientReference" is what identifies the recipient: a saved name ("Mum", "Dad") OR a wallet address ("0x..."). If the message gives BOTH an address and a name for a new person, put the ADDRESS here, not the name.
 - Names can be MULTIPLE WORDS ("Rou Xuen", "Mary Jane"). Always capture the full name exactly as written - never truncate to the first word.
 - "recipientLabel" is the name of a recipient who is NOT already saved, whenever the message states one - however it is phrased. This includes explicit framing ("his name is John", "save him as John") AND the plain case where a new person's name is simply used alongside their address, e.g. "Send Rou Xuen 0.1 SUI to 0xabc..." means recipientLabel is "Rou Xuen". Set it every time a new recipient's name appears, not only when the wording says "name is". Null only if no name is given for a new recipient.
-- "asset" is "USDC" or "SUI" or null. "frequency" is "ONE_TIME" or "MONTHLY" or null.
+- "asset" is "USDC" or "SUI" or null. "frequency" is "ONE_TIME", "DAILY", or "MONTHLY" or null.
 - "urgencyLanguage": true if the message pressures speed or uses emergency framing.
 - "scamPatternFlag": true if the narrative matches a common social-engineering / emergency-scam script.
 - "claimsToVerify": short list of factual claims a human would need to check (e.g. "sister is in hospital"). Do NOT try to verify them.
@@ -23,7 +23,7 @@ Examples:
 - "Send Rou Xuen 0.1 SUI to 0xabc123, this is a test" -> recipientReference "0xabc123", recipientLabel "Rou Xuen" (full two-word name, not "Rou").
 
 Schema:
-{"recipientReference":string|null,"recipientLabel":string|null,"amount":number|null,"asset":"USDC"|"SUI"|null,"frequency":"ONE_TIME"|"MONTHLY"|null,"monthlyDay":number|null,"note":string|null,"urgencyLanguage":boolean,"scamPatternFlag":boolean,"claimsToVerify":string[],"confidence":number,"rationale":string}`;
+{"recipientReference":string|null,"recipientLabel":string|null,"amount":number|null,"asset":"USDC"|"SUI"|null,"frequency":"ONE_TIME"|"DAILY"|"MONTHLY"|null,"monthlyDay":number|null,"note":string|null,"urgencyLanguage":boolean,"scamPatternFlag":boolean,"claimsToVerify":string[],"confidence":number,"rationale":string}`;
 
 function coerceIntent(value: unknown): ParsedIntent | null {
   if (!value || typeof value !== 'object') {
@@ -123,6 +123,9 @@ function normalizeFrequency(value: unknown): string | null {
   const v = value.trim().toUpperCase().replace(/[\s-]/g, '_');
   if (v === 'ONE_TIME' || v === 'ONCE' || v === 'SINGLE') {
     return 'ONE_TIME';
+  }
+  if (v === 'DAILY' || v === 'EVERY_DAY' || v === 'EACH_DAY') {
+    return 'DAILY';
   }
   if (v === 'MONTHLY' || v === 'RECURRING' || v === 'EVERY_MONTH') {
     return 'MONTHLY';

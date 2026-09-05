@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Link } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
-import { AppPage, PlaceholderCard } from '@/components/app-page';
+import { AppPage } from '@/components/app-page';
 import { useAuth } from '@/lib/auth/auth-context';
 import { LANGUAGES, useI18n } from '@/lib/i18n/i18n-context';
 import { requestTestnetSui } from '@/lib/sui/faucet';
@@ -87,25 +88,7 @@ export default function SettingsScreen() {
           </ScrollView>
         </View>
 
-        <PlaceholderCard
-          title="VeriPlan"
-          detail="Plan your budget before setting up recurring remittances. Describe your income, essential expenses, savings target, and family support, and budget analysis will help explain payment affordability."
-          action="Create a plan"
-        />
-        <PlaceholderCard
-          title="Guardians"
-          detail="Trusted people who can provide a second approval for high-value or high-risk payments."
-          action="Add guardian"
-        />
-        <PlaceholderCard
-          title="Payment policies"
-          detail="Set thresholds and rules for new recipients, changed wallets, and second-person approval."
-          action="Add policy"
-        />
-        <Text className="text-xs leading-5 text-slate-500">
-          VeriPlan, guardians, and payment policies are visual placeholders. Their connected
-          workflows will be available in later phases.
-        </Text>
+        <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5"><Text className="text-base font-semibold text-white">Payment policies</Text><Text className="text-sm leading-5 text-slate-400">Set high-value thresholds, new-recipient and changed-wallet protection, plus Guardian approval.</Text><Link href="/(app)/payment-policies" asChild><Pressable accessibilityRole="link" className="self-start rounded-lg border border-blue-400/30 bg-blue-400/10 px-4 py-2.5 active:bg-blue-400/20"><Text className="text-sm font-semibold text-blue-300">Manage payment policies</Text></Pressable></Link></View>
       </View>
     </AppPage>
   );

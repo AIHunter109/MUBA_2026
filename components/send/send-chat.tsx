@@ -94,7 +94,12 @@ function describeManual(input: ManualInput): string {
 }
 
 function summaryLine(plan: ResolvedPlan): string {
-  const when = plan.frequency === 'MONTHLY' ? ` every month on day ${plan.monthlyDay ?? 1}` : '';
+  const when =
+    plan.frequency === 'MONTHLY'
+      ? ` every month on day ${plan.monthlyDay ?? 1}`
+      : plan.frequency === 'DAILY'
+        ? ' every day'
+        : '';
   const first = plan.recipientKnown ? '' : ' - this is the first time you have sent to this address';
   return `Got it. Send ${plan.amount} ${plan.asset} to ${plan.recipientName}${when}.${first}`;
 }
@@ -150,7 +155,10 @@ function claimSummary(result: ClaimCheckResult): string {
   return matching?.rationale ?? (result.verdict === 'SUPPORTED' ? 'Corroborated by real coverage.' : 'Refuted by real coverage.');
 }
 
-export type ConfirmResult = { outcome: TransferOutcome; saveNotice: string | null; saveOk: boolean };
+export type ConfirmResult =
+  | { status: 'sent'; outcome: TransferOutcome; saveNotice: string | null; saveOk: boolean }
+  /** A guardian policy requires a second approval before this can execute at all. */
+  | { status: 'held'; expiresAt: string };
 
 /**
  * The whole Send experience as one continuous conversation: type a message or
@@ -383,9 +391,18 @@ export function SendChat({
     setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, busy: true } : it)));
     setStage('sending');
     try {
-      const { outcome, saveNotice, saveOk } = await onConfirm(item.plan, item.saveName);
+      const result = await onConfirm(item.plan, item.saveName);
+      if (result.status === 'held') {
+        setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, busy: false } : it)));
+        say(
+          `Your guardian needs to approve this payment first. This request expires ${new Date(result.expiresAt).toLocaleString()}. Once approved, press Confirm & Send again.`,
+          'info',
+        );
+        setStage('ready');
+        return;
+      }
       setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, busy: false, status: 'sent' } : it)));
-      push({ id: nextId(), kind: 'receipt', outcome, plan: item.plan, saveNotice, saveOk });
+      push({ id: nextId(), kind: 'receipt', outcome: result.outcome, plan: item.plan, saveNotice: result.saveNotice, saveOk: result.saveOk });
       setStage('idle');
     } catch (err) {
       setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, busy: false } : it)));

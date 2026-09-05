@@ -9,6 +9,7 @@ import { assessManualPlan, confirmAndExecute, parseMessage } from '@/lib/intent/
 import { useRecipients } from '@/lib/recipients/use-recipients';
 import { apiPost } from '@/lib/sui/api';
 import { SUPPORTED_COINS, toBaseUnits, USDC_COIN } from '@/lib/sui/coins';
+import { SUI_NETWORK } from '@/lib/sui/network';
 import { saveSettledTransaction } from '@/lib/transactions/ledger';
 import type { ResolvedPlan } from '@/shared/contracts';
 
@@ -48,6 +49,21 @@ export default function SendScreen() {
 
   const onConfirm = useCallback(
     async (plan: ResolvedPlan, saveName: string): Promise<ConfirmResult> => {
+      // A guardian policy (high amount / first-time recipient / changed wallet)
+      // can require a second approval before this transfer is allowed to
+      // execute at all - checked fresh on every attempt, since an earlier hold
+      // may have since been approved.
+      const gate = await apiPost<{ required: boolean; expiresAt?: string }>('/v1/approval-requests/gate', {
+        owner,
+        recipient: plan.recipientAddress,
+        amount: String(plan.amount),
+        asset: plan.asset,
+        reason: plan.note,
+      });
+      if (gate.required) {
+        return { status: 'held', expiresAt: gate.expiresAt ?? new Date().toISOString() };
+      }
+
       const signer = await getSigner();
       const outcome = await confirmAndExecute(signer, plan);
 
@@ -69,25 +85,56 @@ export default function SendScreen() {
       }
 
       if (outcome.status === 'success') {
+        const coin = SUPPORTED_COINS.find((c) => c.symbol === plan.asset) ?? USDC_COIN;
+        const record = {
+          id: outcome.digest,
+          digest: outcome.digest,
+          recipient: plan.recipientAddress,
+          amountBaseUnits: toBaseUnits(String(plan.amount), coin.decimals).toString(),
+          coinType: coin.type,
+          symbol: coin.symbol,
+          decimals: coin.decimals,
+          occurredAt: new Date().toISOString(),
+          status: 'success' as const,
+        };
+
+        // Local storage makes the receipt instant; the API ledger lets the
+        // dashboard recover it on a different device or after storage is cleared.
         try {
-          const coin = SUPPORTED_COINS.find((c) => c.symbol === plan.asset) ?? USDC_COIN;
-          await saveSettledTransaction({
-            id: outcome.digest,
-            digest: outcome.digest,
-            recipient: plan.recipientAddress,
-            amountBaseUnits: toBaseUnits(String(plan.amount), coin.decimals).toString(),
-            coinType: coin.type,
-            symbol: coin.symbol,
-            decimals: coin.decimals,
-            occurredAt: new Date().toISOString(),
-            status: 'success',
+          await saveSettledTransaction(record);
+        } catch {
+          // A settled payment must still succeed if its offline cache is unavailable.
+        }
+        try {
+          await apiPost('/v1/transactions', {
+            owner,
+            digest: record.digest,
+            recipient: record.recipient,
+            amount: String(plan.amount),
+            asset: record.symbol,
+            network: SUI_NETWORK,
           });
         } catch {
-          // The on-chain receipt remains the source of truth on the result card.
+          // The local receipt remains available and a future send can retry its own record.
+        }
+        if (plan.frequency !== 'ONE_TIME') {
+          try {
+            await apiPost('/v1/recurring-rules', {
+              owner,
+              recipientName: plan.recipientName,
+              recipient: plan.recipientAddress,
+              amount: String(plan.amount),
+              asset: plan.asset,
+              frequency: plan.frequency,
+              monthlyDay: plan.monthlyDay,
+            });
+          } catch {
+            // The current transfer remains settled even if its future schedule cannot be saved.
+          }
         }
       }
 
-      return { outcome, saveNotice, saveOk };
+      return { status: 'sent', outcome, saveNotice, saveOk };
     },
     [getSigner, owner],
   );
