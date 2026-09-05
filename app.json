@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.mohanadneotrix.MUBA_2026"
     },
     "web": {
       "output": "static",
@@ -41,7 +42,13 @@
       "expo-font",
       "expo-image",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-nitro-google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.placeholder-not-yet-configured"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

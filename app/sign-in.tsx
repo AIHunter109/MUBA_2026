@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { ActivityIndicator, Platform, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/translated-text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/lib/auth/auth-context';
-import { DEMO_MODE, isEnokiConfigured } from '@/lib/auth/enoki-config';
+import { DEMO_MODE } from '@/lib/auth/enoki-config';
 
 type Feature = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -119,9 +119,7 @@ export default function SignInScreen() {
             <View className="flex-1 gap-0.5">
               <Text className="text-sm font-semibold text-amber-200">Testnet demo</Text>
               <Text className="text-xs leading-5 text-amber-300/90">
-                {isEnokiConfigured && Platform.OS !== 'web'
-                  ? 'Real Google sign-in runs on web. On this device it creates a local test wallet with no Google account.'
-                  : 'Sign-in creates a local test wallet. No real money is involved.'}
+                Sign-in creates a local test wallet. No real money is involved.
               </Text>
             </View>
           </View>
