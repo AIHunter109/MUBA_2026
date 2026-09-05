@@ -5,7 +5,7 @@
   "scripts": {
     "build": "expo export -p web",
     "start": "expo start",
-    "server": "npm run db:deploy && tsx --env-file-if-exists=server/.env server/src/index.ts",
+    "server": "npm run db:deploy && tsx --env-file-if-exists=prisma/.env --env-file-if-exists=server/.env server/src/index.ts",
     "db:deploy": "prisma migrate deploy",
     "typecheck": "tsc --noEmit",
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",

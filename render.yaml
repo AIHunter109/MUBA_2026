@@ -2,10 +2,10 @@
 # Deploy: render.com -> New -> Blueprint -> connect this repo.
 # Then set the secret env vars marked `sync: false` in the dashboard.
 #
-# Note: the free plan has no persistent disk, so the SQLite database resets on
-# every deploy. Fine for a demo (re-add recipients after a deploy); switch the
-# Prisma provider to Postgres + a Render Postgres instance if you need it to
-# stick.
+# Database is Supabase Postgres (see prisma/schema.prisma). Set DATABASE_URL to
+# the transaction-mode pooler URL (port 6543, ?pgbouncer=true) and DIRECT_URL to
+# the session-mode pooler URL (port 5432) - both from the Supabase project's
+# Connect dialog.
 services:
   - type: web
     name: remitguard-api
@@ -18,14 +18,16 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22.12.0
-      - key: DATABASE_URL
-        value: file:./dev.db
       - key: DEMO_MODE
         value: "false"
       - key: SUI_NETWORK
         value: testnet
       - key: CONFIRMATION_TOKEN_SECRET
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
       - key: GONKA_API_KEY
         sync: false
       - key: NEWSAPI_KEY
