@@ -12,6 +12,7 @@ export class TransactionError extends Error {
 export type TransactionDto = {
   digest: string;
   recipient: string;
+  recipientName?: string;
   amount: string;
   asset: 'USDC' | 'SUI';
   status: 'success';
@@ -57,7 +58,7 @@ export async function recordSettledTransaction(input: {
   const asset = validateAsset(input.asset);
   const recipient = await prisma.recipient.findFirst({
     where: { userId, address: recipientAddress },
-    select: { id: true },
+    select: { id: true, name: true },
   });
 
   const row = await prisma.transaction.upsert({
@@ -78,6 +79,7 @@ export async function recordSettledTransaction(input: {
   return {
     digest: row.digest as string,
     recipient: row.recipientAddress ?? recipientAddress,
+    recipientName: recipient?.name,
     amount: row.amount.toString(),
     asset: row.asset as 'USDC' | 'SUI',
     status: 'success',
@@ -87,18 +89,20 @@ export async function recordSettledTransaction(input: {
 
 export async function listTransactions(owner: string): Promise<TransactionDto[]> {
   const userId = await resolveUserId(owner);
-  const rows = await prisma.transaction.findMany({
+  const [rows, recipients] = await Promise.all([prisma.transaction.findMany({
     where: { userId, status: 'success' },
     orderBy: { createdAt: 'desc' },
     take: 100,
-    include: { recipient: { select: { address: true } } },
-  });
+    include: { recipient: { select: { address: true, name: true } } },
+  }), prisma.recipient.findMany({ where: { userId }, select: { address: true, name: true } })]);
+  const namesByAddress = new Map(recipients.map((recipient) => [recipient.address, recipient.name]));
 
   return rows
     .filter((row): row is typeof row & { digest: string } => Boolean(row.digest))
     .map((row) => ({
       digest: row.digest,
       recipient: row.recipientAddress ?? row.recipient?.address ?? '',
+      recipientName: row.recipient?.name ?? namesByAddress.get(row.recipientAddress ?? ''),
       amount: row.amount.toString(),
       asset: row.asset as 'USDC' | 'SUI',
       status: 'success' as const,

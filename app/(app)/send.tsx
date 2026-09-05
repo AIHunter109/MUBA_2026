@@ -21,7 +21,7 @@ import { saveSettledTransaction } from '@/lib/transactions/ledger';
 import type { IntentReview, ResolvedPlan, TransferAsset } from '@/shared/contracts';
 
 type Mode = 'describe' | 'manual';
-type Phase = 'compose' | 'checking' | 'review' | 'submitting' | 'done';
+type Phase = 'compose' | 'checking' | 'review' | 'submitting' | 'held' | 'done';
 
 const EXAMPLES = [
   'Send Mum 100 USDC for groceries',
@@ -54,6 +54,7 @@ export default function SendScreen() {
     name: string;
     message: string;
   } | null>(null);
+  const [approvalHold, setApprovalHold] = useState<{ expiresAt: string } | null>(null);
 
   const owner = session?.walletAddress ?? '';
 
@@ -65,6 +66,7 @@ export default function SendScreen() {
     setSaveName('');
     setOutcome(null);
     setRecipientSaveNotice(null);
+    setApprovalHold(null);
     setMessage('');
     setPicked(null);
     setOtherAddress('');
@@ -117,6 +119,14 @@ export default function SendScreen() {
     setError(null);
     setPhase('submitting');
     try {
+      const gate = await apiPost<{ required: boolean; expiresAt?: string }>('/v1/approval-requests/gate', {
+        owner, recipient: plan.recipientAddress, amount: String(plan.amount), asset: plan.asset, reason: plan.note,
+      });
+      if (gate.required) {
+        setApprovalHold({ expiresAt: gate.expiresAt ?? new Date().toISOString() });
+        setPhase('held');
+        return;
+      }
       const signer = await getSigner();
       const result = await confirmAndExecute(signer, plan);
 
@@ -203,6 +213,10 @@ export default function SendScreen() {
       setPhase('review');
     }
   }, [review, getSigner, saveName, owner]);
+
+  if (phase === 'held' && approvalHold) {
+    return <Screen gap={20}><Ionicons name="time-outline" size={44} color="#fbbf24" /><Text className="text-3xl font-bold text-white">Payment pending approval</Text><Text className="text-base leading-6 text-slate-300">Your guardian has received the amount, asset, recipient, and payment reason. No transaction has been submitted yet.</Text><Text className="text-sm text-slate-500">This request expires {new Date(approvalHold.expiresAt).toLocaleString()}.</Text><Pressable accessibilityRole="button" onPress={() => void send()} className="items-center rounded-xl bg-blue-600 px-5 py-4"><Text className="font-bold text-white">Check approval and continue</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setPhase('review')} className="items-center rounded-xl border border-slate-700 px-5 py-4"><Text className="font-semibold text-slate-300">Back to review</Text></Pressable></Screen>;
+  }
 
   // --- done -----------------------------------------------------------------
   if (phase === 'done' && outcome) {

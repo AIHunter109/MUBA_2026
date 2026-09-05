@@ -19,6 +19,75 @@ model User {
   recurringRules  RecurringRule[]
   prompts         ReconciliationPrompt[]
   idempotencyKeys IdempotencyKey[]
+  guardians       Guardian[]
+  approvalPolicy  ApprovalPolicy?
+  approvalRequests ApprovalRequest[]
+  budgetPlans      BudgetPlan[]
+}
+
+model BudgetPlan {
+  id               String   @id @default(cuid())
+  userId           String
+  recipientName    String
+  recipientAddress String
+  income           Decimal
+  essentials       Decimal
+  savings          Decimal
+  monthlySupport   Decimal
+  remaining        Decimal
+  asset            String
+  frequency        String
+  result           String
+  explanation      String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Guardian {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  address   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requests  ApprovalRequest[]
+
+  @@unique([userId, address])
+  @@index([address])
+}
+
+model ApprovalPolicy {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  thresholdUsdc       Decimal?
+  thresholdSui        Decimal?
+  requireNewRecipient Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  guardianId String
+  recipient String
+  amount    Decimal
+  asset     String
+  reason    String?
+  status    String   @default("PENDING")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guardian  Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@index([guardianId, status])
+  @@index([userId, status])
 }
 
 model AuthIdentity {

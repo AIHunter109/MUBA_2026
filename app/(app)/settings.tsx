@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Link } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
@@ -87,18 +88,14 @@ export default function SettingsScreen() {
           </ScrollView>
         </View>
 
-        <PlaceholderCard
-          title="Guardians"
-          detail="Trusted people who can provide a second approval for high-value or high-risk payments."
-          action="Add guardian"
-        />
+        <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5"><Text className="text-base font-semibold text-white">Guardians</Text><Text className="text-sm leading-5 text-slate-400">Add trusted wallets and set payment approval thresholds.</Text><Link href="/(app)/guardians" asChild><Pressable accessibilityRole="link" className="self-start rounded-lg border border-blue-400/30 bg-blue-400/10 px-4 py-2.5 active:bg-blue-400/20"><Text className="text-sm font-semibold text-blue-300">Manage guardians</Text></Pressable></Link></View>
         <PlaceholderCard
           title="Payment policies"
           detail="Set thresholds and rules for new recipients, changed wallets, and second-person approval."
           action="Add policy"
         />
         <Text className="text-xs leading-5 text-slate-500">
-          Guardians and payment policies are visual placeholders. Configure them in a future phase.
+          Payment policies are a visual placeholder. Guardian controls are ready to use.
         </Text>
       </View>
     </AppPage>

@@ -14,6 +14,7 @@ import { useI18n } from '@/lib/i18n/i18n-context';
 type StoredTransaction = {
   digest: string;
   recipient: string;
+  recipientName?: string;
   amount: string;
   asset: 'USDC' | 'SUI';
   occurredAt: string;
@@ -31,6 +32,7 @@ async function loadTransactions(owner: string): Promise<TransactionRecord[]> {
           id: transaction.digest,
           digest: transaction.digest,
           recipient: transaction.recipient,
+          recipientName: transaction.recipientName,
           amountBaseUnits: toBaseUnits(transaction.amount, coin.decimals).toString(),
           coinType: coin.type,
           symbol: coin.symbol,
@@ -90,7 +92,7 @@ export default function HistoryScreen() {
 
 function HistoryRow({ transaction }: { transaction: TransactionRecord }) {
   const date = new Date(transaction.occurredAt);
-  const recipient = transaction.recipient ? `${transaction.recipient.slice(0, 8)}…${transaction.recipient.slice(-6)}` : 'Unknown recipient';
+  const recipient = transaction.recipientName ?? (transaction.recipient ? `${transaction.recipient.slice(0, 8)}…${transaction.recipient.slice(-6)}` : 'Unknown recipient');
   return (
     <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(explorerTxUrl(transaction.digest))} className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 active:bg-slate-800">
       <View className="flex-row items-center justify-between gap-3">

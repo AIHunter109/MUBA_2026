@@ -23,6 +23,8 @@ import {
   recordSettledTransaction,
 } from './transactions/store';
 import { listRecurringRules, RecurringRuleError, saveRecurringRule } from './recurring/store';
+import { addGuardian, approvalGate, decideRequest, GuardianError, listApprovalRequests, listGuardians, removeGuardian, savePolicy } from './guardians/store';
+import { BudgetPlanError, listBudgetPlans, saveBudgetPlan } from './budget/store';
 import { assessPlan } from './safety/assess-plan';
 import type { SavedRecipient } from './safety/consensus';
 import { hashPlan, reviewMessage } from './safety/review';
@@ -84,6 +86,11 @@ function writeRecurringRuleError(response: ServerResponse, error: unknown, reque
   const message = error instanceof Error ? error.message : 'Recurring rule operation failed';
   writeApiError(response, 500, 'RECURRING_RULE_FAILED', message, requestId);
 }
+function writeGuardianError(response: ServerResponse, error: unknown, requestId: string): void {
+  const message = error instanceof Error ? error.message : 'Guardian operation failed';
+  writeApiError(response, error instanceof GuardianError ? 400 : 500, error instanceof GuardianError ? 'GUARDIAN_INVALID' : 'GUARDIAN_FAILED', message, requestId);
+}
+function writeBudgetPlanError(response: ServerResponse, error: unknown, requestId: string): void { writeApiError(response, error instanceof BudgetPlanError ? 400 : 500, error instanceof BudgetPlanError ? 'BUDGET_PLAN_INVALID' : 'BUDGET_PLAN_FAILED', error instanceof Error ? error.message : 'Budget plan operation failed', requestId); }
 
 const server = createServer((request, response) => {
   const requestId = request.headers['x-request-id']?.toString() || randomUUID();
@@ -237,6 +244,38 @@ const server = createServer((request, response) => {
       .then((rules) => writeJson(response, 200, { rules }, requestId))
       .catch((error: unknown) => writeRecurringRuleError(response, error, requestId));
     return;
+  }
+
+  if (method === 'GET' && path === '/v1/guardians') {
+    const owner = new URL(request.url || '/', 'http://localhost').searchParams.get('owner');
+    if (!owner) { writeApiError(response, 400, 'OWNER_REQUIRED', 'owner is required', requestId); return; }
+    listGuardians(owner).then((result) => writeJson(response, 200, result, requestId)).catch((error: unknown) => writeGuardianError(response, error, requestId)); return;
+  }
+  if (method === 'POST' && path === '/v1/guardians') {
+    readJsonBody(request).then(async body => { const owner = asString(body.owner); const name = asString(body.name); const address = asString(body.address); if (!owner || !name || !address) { writeApiError(response, 400, 'INVALID_REQUEST', 'owner, name and address are required', requestId); return; } writeJson(response, 200, { guardian: await addGuardian(owner, name, address) }, requestId); }).catch((error: unknown) => writeGuardianError(response, error, requestId)); return;
+  }
+  if (method === 'POST' && path === '/v1/guardians/remove') {
+    readJsonBody(request).then(async body => { const owner = asString(body.owner); const id = asString(body.id); if (!owner || !id) { writeApiError(response, 400, 'INVALID_REQUEST', 'owner and id are required', requestId); return; } await removeGuardian(owner, id); writeJson(response, 200, { ok: true }, requestId); }).catch((error: unknown) => writeGuardianError(response, error, requestId)); return;
+  }
+  if (method === 'POST' && path === '/v1/guardians/policy') {
+    readJsonBody(request).then(async body => { const owner = asString(body.owner); const usdc = typeof body.thresholdUsdc === 'string' ? body.thresholdUsdc : ''; const sui = typeof body.thresholdSui === 'string' ? body.thresholdSui : ''; if (!owner || typeof body.requireNewRecipient !== 'boolean') { writeApiError(response, 400, 'INVALID_REQUEST', 'owner and requireNewRecipient are required', requestId); return; } await savePolicy(owner, usdc, sui, body.requireNewRecipient); writeJson(response, 200, { ok: true }, requestId); }).catch((error: unknown) => writeGuardianError(response, error, requestId)); return;
+  }
+  if (method === 'GET' && path === '/v1/approval-requests') {
+    const guardian = new URL(request.url || '/', 'http://localhost').searchParams.get('guardian'); if (!guardian) { writeApiError(response, 400, 'GUARDIAN_REQUIRED', 'guardian is required', requestId); return; }
+    listApprovalRequests(guardian).then(requests => writeJson(response, 200, { requests }, requestId)).catch((error: unknown) => writeGuardianError(response, error, requestId)); return;
+  }
+  if (method === 'POST' && path === '/v1/approval-requests/decision') {
+    readJsonBody(request).then(async body => { const guardian = asString(body.guardian); const id = asString(body.id); if (!guardian || !id || typeof body.approve !== 'boolean') { writeApiError(response, 400, 'INVALID_REQUEST', 'guardian, id and approve are required', requestId); return; } await decideRequest(guardian, id, body.approve); writeJson(response, 200, { ok: true }, requestId); }).catch((error: unknown) => writeGuardianError(response, error, requestId)); return;
+  }
+  if (method === 'POST' && path === '/v1/approval-requests/gate') {
+    readJsonBody(request).then(async body => { const owner = asString(body.owner); const recipient = asString(body.recipient); const amount = asString(body.amount); const asset = asString(body.asset); const reason = typeof body.reason === 'string' ? body.reason : null; if (!owner || !recipient || !amount || !asset) { writeApiError(response, 400, 'INVALID_REQUEST', 'owner, recipient, amount and asset are required', requestId); return; } writeJson(response, 200, await approvalGate({ owner, recipient, amount, asset, reason }), requestId); }).catch((error: unknown) => writeGuardianError(response, error, requestId)); return;
+  }
+  if (method === 'GET' && path === '/v1/budget-plans') {
+    const owner = new URL(request.url || '/', 'http://localhost').searchParams.get('owner'); if (!owner) { writeApiError(response, 400, 'OWNER_REQUIRED', 'owner is required', requestId); return; }
+    listBudgetPlans(owner).then(plans => writeJson(response, 200, { plans }, requestId)).catch((error: unknown) => writeBudgetPlanError(response, error, requestId)); return;
+  }
+  if (method === 'POST' && path === '/v1/budget-plans') {
+    readJsonBody(request).then(async body => { const keys = ['owner', 'recipientName', 'recipientAddress', 'income', 'essentials', 'savings', 'monthlySupport', 'remaining', 'asset', 'frequency', 'result', 'explanation']; const input: Record<string, string> = {}; for (const key of keys) { const value = asString(body[key]); if (!value) { writeApiError(response, 400, 'INVALID_REQUEST', `${key} is required`, requestId); return; } input[key] = value; } writeJson(response, 200, { plan: await saveBudgetPlan(input) }, requestId); }).catch((error: unknown) => writeBudgetPlanError(response, error, requestId)); return;
   }
 
   if (method === 'POST' && path === '/v1/recurring-rules') {

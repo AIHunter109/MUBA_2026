@@ -1,17 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 
 import { AppPage } from '@/components/app-page';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useRecipients, type Recipient } from '@/lib/recipients/use-recipients';
-import { apiPost } from '@/lib/sui/api';
+import { apiGet, apiPost } from '@/lib/sui/api';
 
 type Frequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 type Asset = 'USDC' | 'SUI';
 type Result = 'Comfortable' | 'Tight' | 'Over Budget';
 type Phase = 'edit' | 'review' | 'saving' | 'done';
+type ViewMode = 'create' | 'plans';
+type SavedPlan = { id: string; recipientName: string; income: string; essentials: string; savings: string; monthlySupport: string; remaining: string; asset: Asset; frequency: string; result: Result; explanation: string; createdAt: string };
 
 const FREQUENCIES: { value: Frequency; label: string; monthlyMultiplier: number }[] = [
   { value: 'WEEKLY', label: 'Weekly', monthlyMultiplier: 52 / 12 },
@@ -56,6 +58,16 @@ export default function RemitPlanScreen() {
   const [recipient, setRecipient] = useState<Recipient | null>(null);
   const [phase, setPhase] = useState<Phase>('edit');
   const [error, setError] = useState<string | null>(null);
+  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('create');
+
+  const loadSavedPlans = useCallback(async () => {
+    if (!session?.walletAddress) return;
+    const { plans } = await apiGet<{ plans: SavedPlan[] }>(`/v1/budget-plans?owner=${encodeURIComponent(session.walletAddress)}`).catch(() => ({ plans: [] }));
+    setSavedPlans(plans);
+  }, [session?.walletAddress]);
+
+  useFocusEffect(useCallback(() => { void loadSavedPlans(); }, [loadSavedPlans]));
 
   const budget = useMemo(() => {
     const income = amount(salary) + amount(otherIncome);
@@ -97,6 +109,13 @@ export default function RemitPlanScreen() {
         frequency,
         monthlyDay: frequency === 'MONTHLY' ? new Date().getDate() : null,
       });
+      await apiPost('/v1/budget-plans', {
+        owner: session.walletAddress, recipientName: recipient.name, recipientAddress: recipient.address,
+        income: String(budget.income), essentials: String(budget.essentials), savings: String(budget.savings),
+        monthlySupport: String(budget.support), remaining: String(budget.remaining), asset, frequency,
+        result: budget.result, explanation: budget.explanation,
+      });
+      await loadSavedPlans();
       setPhase('done');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save the recurring plan.');
@@ -111,8 +130,8 @@ export default function RemitPlanScreen() {
           <Ionicons name="checkmark-circle" size={28} color="#34d399" />
           <Text className="text-lg font-bold text-white">Recurring remittance set up</Text>
           <Text className="text-sm leading-5 text-emerald-100">{recipient?.name} will receive {supportAmount} {asset} {budget.selectedFrequency.label.toLowerCase()}.</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.replace('/(app)')} className="items-center rounded-xl bg-emerald-500 px-5 py-3 active:bg-emerald-400">
-            <Text className="font-bold text-slate-950">View upcoming payments</Text>
+          <Pressable accessibilityRole="button" onPress={() => { setPhase('edit'); setViewMode('plans'); }} className="items-center rounded-xl bg-emerald-500 px-5 py-3 active:bg-emerald-400">
+            <Text className="font-bold text-slate-950">Review saved plans</Text>
           </Pressable>
         </View>
       </AppPage>
@@ -153,8 +172,29 @@ export default function RemitPlanScreen() {
     );
   }
 
+  const planSwitcher = (
+    <View className="flex-row gap-2">
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: viewMode === 'create' }} onPress={() => setViewMode('create')} className={`flex-1 rounded-xl border px-3 py-3 ${viewMode === 'create' ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-900/70'}`}>
+        <Text className={`text-center font-semibold ${viewMode === 'create' ? 'text-blue-300' : 'text-slate-300'}`}>Create plan</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: viewMode === 'plans' }} onPress={() => setViewMode('plans')} className={`flex-1 rounded-xl border px-3 py-3 ${viewMode === 'plans' ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-900/70'}`}>
+        <Text className={`text-center font-semibold ${viewMode === 'plans' ? 'text-blue-300' : 'text-slate-300'}`}>Review plans</Text>
+      </Pressable>
+    </View>
+  );
+
+  if (viewMode === 'plans') {
+    return (
+      <AppPage title="RemitPlan" subtitle="Review the budget plans you have confirmed.">
+        {planSwitcher}
+        {savedPlans.length ? <View className="gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-5"><View className="flex-row items-center gap-2"><Ionicons name="clipboard-outline" size={19} color="#34d399" /><Text className="text-base font-bold text-white">Saved RemitPlans</Text></View>{savedPlans.map((plan) => <View key={plan.id} className="gap-2 border-t border-emerald-400/10 pt-3"><View className="flex-row items-center justify-between gap-3"><Text className="font-semibold text-slate-200">{plan.recipientName} · {plan.frequency.toLowerCase()}</Text><Text className={`text-sm font-bold ${plan.result === 'Comfortable' ? 'text-emerald-300' : plan.result === 'Tight' ? 'text-amber-300' : 'text-red-300'}`}>{plan.result}</Text></View><Text className="text-xs text-slate-400">Income {plan.income} − essentials {plan.essentials} − savings {plan.savings} − support {plan.monthlySupport} = <Text className="font-semibold text-slate-200">{plan.remaining} {plan.asset}</Text></Text><Text className="text-xs leading-5 text-slate-500">{plan.explanation}</Text></View>)}</View> : <View className="items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-6"><Ionicons name="clipboard-outline" size={28} color="#64748b" /><Text className="font-semibold text-slate-200">No saved plans yet</Text><Text className="text-center text-sm text-slate-500">Create and confirm a RemitPlan to review it here.</Text></View>}
+      </AppPage>
+    );
+  }
+
   return (
     <AppPage title="RemitPlan" subtitle="Plan family support around your real monthly budget before setting up a recurring remittance.">
+      {planSwitcher}
       <Section title="Planning asset" detail="Use one asset for all budget inputs so affordability math stays meaningful.">
         <View className="flex-row gap-2">
           {(['USDC', 'SUI'] as Asset[]).map((item) => <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: asset === item }} onPress={() => setAsset(item)} className={`flex-1 rounded-xl border px-3 py-3 ${asset === item ? 'border-blue-400 bg-blue-400/10' : 'border-slate-700 bg-slate-950/50'}`}><Text className={`text-center text-sm font-semibold ${asset === item ? 'text-blue-300' : 'text-slate-300'}`}>{item}</Text></Pressable>)}

@@ -14,6 +14,7 @@ type BalanceRow = { coinType: string; symbol: string; decimals: number; balance:
 type StoredTransaction = {
   digest: string;
   recipient: string;
+  recipientName?: string;
   amount: string;
   asset: 'USDC' | 'SUI';
   status: 'success';
@@ -46,6 +47,7 @@ async function fetchStoredTransactions(address: string): Promise<TransactionReco
       id: transaction.digest,
       digest: transaction.digest,
       recipient: transaction.recipient,
+      recipientName: transaction.recipientName,
       amountBaseUnits: toBaseUnits(transaction.amount, coin.decimals).toString(),
       coinType: coin.type,
       symbol: coin.symbol,
@@ -345,7 +347,7 @@ function TransactionRow({ transaction, compact }: { transaction: TransactionReco
   return (
     <View className="justify-between border-b border-slate-800 pb-3 last:border-b-0 last:pb-0" style={{ flexDirection: compact ? 'column' : 'row', alignItems: compact ? 'flex-start' : 'center', gap: compact ? 4 : 0 }}>
       <View className="min-w-0 flex-1 gap-0.5 pr-3">
-        <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>Sent to {shortAddress(transaction.recipient)}</Text>
+        <Text className="text-sm font-semibold text-slate-200" numberOfLines={1}>Sent to {transaction.recipientName ?? shortAddress(transaction.recipient)}</Text>
         <Text className="text-xs text-slate-500">
           {new Date(transaction.occurredAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
         </Text>
