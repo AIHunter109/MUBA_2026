@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, type ScrollViewProps, useWindowDimensions, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, type ScrollViewProps, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ScreenProps = {
@@ -49,14 +49,22 @@ export function Screen({
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-slate-950"
-      contentContainerStyle={containerStyle}
-      contentInsetAdjustmentBehavior="automatic"
-      refreshControl={refreshControl}
-      keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-    >
-      {children}
-    </ScrollView>
+    // Long forms (e.g. Budget Planner) have TextInputs stacked well below the fold -
+    // without this, the keyboard can cover a focused field with no way to scroll it
+    // into view on Android, and iOS gets no avoidance at all. "padding" on iOS only,
+    // matching the convention already used in send-chat.tsx: Android is left to its
+    // default windowSoftInputMode="adjustResize" behavior rather than double-applying
+    // avoidance on top of it.
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+      <ScrollView
+        className="flex-1 bg-slate-950"
+        contentContainerStyle={containerStyle}
+        contentInsetAdjustmentBehavior="automatic"
+        refreshControl={refreshControl}
+        keyboardShouldPersistTaps={keyboardShouldPersistTaps ?? 'handled'}
+      >
+        {children}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

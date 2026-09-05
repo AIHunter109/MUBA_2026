@@ -17,6 +17,7 @@ import type { Recipient } from '@/lib/recipients/use-recipients';
 import { explorerTxUrl } from '@/lib/sui/network';
 import type { ClaimCheckResult, IntentReview, ResolvedPlan, SafetyFlag } from '@/shared/contracts';
 
+import { FactCheckSheet } from './fact-check-sheet';
 import { ManualSheet, type ManualInput } from './manual-sheet';
 import { ReasoningTrace, type TraceStep } from './reasoning-trace';
 
@@ -190,6 +191,7 @@ export function SendChat({
   const [nameDraft, setNameDraft] = useState('');
   const [draft, setDraft] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
+  const [factCheckOpen, setFactCheckOpen] = useState(false);
   const reviewRef = useRef<IntentReview | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -498,12 +500,14 @@ export function SendChat({
         onChangeText={setDraft}
         onSend={submitMessage}
         onOpenManual={() => setManualOpen(true)}
+        onOpenFactCheck={() => setFactCheckOpen(true)}
         disabled={!canCompose}
         showExamples={items.length <= 1}
         onPickExample={(ex) => setDraft(ex)}
       />
 
       <ManualSheet visible={manualOpen} recipients={recipients} onClose={() => setManualOpen(false)} onSubmit={submitManual} />
+      <FactCheckSheet visible={factCheckOpen} onClose={() => setFactCheckOpen(false)} />
     </KeyboardAvoidingView>
   );
 }
@@ -812,6 +816,7 @@ function Composer({
   onChangeText,
   onSend,
   onOpenManual,
+  onOpenFactCheck,
   disabled,
   showExamples,
   onPickExample,
@@ -820,6 +825,7 @@ function Composer({
   onChangeText: (text: string) => void;
   onSend: () => void;
   onOpenManual: () => void;
+  onOpenFactCheck: () => void;
   disabled: boolean;
   showExamples: boolean;
   onPickExample: (example: string) => void;
@@ -859,6 +865,13 @@ function Composer({
           className="h-11 w-11 items-center justify-center rounded-full border border-slate-700 active:bg-slate-800 disabled:opacity-40"
         >
           <Ionicons name="create-outline" size={19} color="#94a3b8" />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenFactCheck}
+          className="h-11 w-11 items-center justify-center rounded-full border border-slate-700 active:bg-slate-800"
+        >
+          <Ionicons name="shield-checkmark-outline" size={19} color="#94a3b8" />
         </Pressable>
         <TextInput
           value={value}
