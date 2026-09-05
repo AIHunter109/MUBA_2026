@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import type { Recipient } from '@/lib/recipients/use-recipients';
 
@@ -103,7 +103,10 @@ export function BudgetChat({
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="gap-3">
+    // No KeyboardAvoidingView here - this is embedded mid-form inside the Budget
+    // Planner's own Screen, which already wraps the whole page in one. A second,
+    // nested one here would apply avoidance twice and fight the outer one.
+    <View className="gap-3">
       <View className="flex-row items-center gap-2">
         <Ionicons name="chatbubbles-outline" size={20} color="#60a5fa" />
         <Text className="text-base font-bold text-white">Budget assistant</Text>
@@ -141,6 +144,6 @@ export function BudgetChat({
           </Pressable>
         ))}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

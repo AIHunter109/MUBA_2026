@@ -88,7 +88,7 @@ export default function AppLayoutWeb() {
   const { t } = useI18n();
   const { width } = useWindowDimensions();
   const nav: NavItem[] = [
-    { label: 'Budget Planner', href: '/(app)/settings/budget-planner', icon: 'calculator-outline' }, { label: t('home'), href: '/(app)', icon: 'home-outline' }, { label: t('send'), href: '/(app)/send', icon: 'paper-plane-outline' }, { label: t('guardians'), href: '/(app)/settings/guardians', icon: 'shield-checkmark-outline' }, { label: t('recipients'), href: '/(app)/recipients', icon: 'people-outline' }, { label: t('history'), href: '/(app)/history', icon: 'receipt-outline' }, { label: t('settings'), href: '/(app)/settings', icon: 'settings-outline' },
+    { label: t('home'), href: '/(app)', icon: 'home-outline' }, { label: t('send'), href: '/(app)/send', icon: 'paper-plane-outline' }, { label: 'Budget Planner', href: '/(app)/settings/budget-planner', icon: 'calculator-outline' }, { label: t('guardians'), href: '/(app)/settings/guardians', icon: 'shield-checkmark-outline' }, { label: t('recipients'), href: '/(app)/recipients', icon: 'people-outline' }, { label: t('history'), href: '/(app)/history', icon: 'receipt-outline' }, { label: t('settings'), href: '/(app)/settings', icon: 'settings-outline' },
   ];
   const bottomNav = nav.filter((item) => ['/(app)', '/(app)/send', '/(app)/settings/budget-planner', '/(app)/settings/guardians', '/(app)/settings'].includes(item.href));
 
