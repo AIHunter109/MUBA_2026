@@ -24,6 +24,7 @@ import {
   recordSettledTransaction,
 } from './transactions/store';
 import { deleteRecurringRule, listRecurringRules, RecurringRuleError, saveRecurringRule } from './recurring/store';
+import { listDueRecurringRules, markRecurringRuleTriggered, ReconciliationError, skipRecurringRule } from './recurring/reconciliation';
 import { addGuardian, approvalGate, decideRequest, GuardianError, listApprovalRequests, listGuardians, removeGuardian, savePolicy } from './guardians/store';
 import { BudgetPlanError, deleteBudgetPlan, listBudgetPlans, saveBudgetPlan } from './budget/store';
 import { assessPlan } from './safety/assess-plan';
@@ -80,7 +81,7 @@ function writeTransactionError(response: ServerResponse, error: unknown, request
 }
 
 function writeRecurringRuleError(response: ServerResponse, error: unknown, requestId: string): void {
-  if (error instanceof RecurringRuleError || error instanceof RecipientError) {
+  if (error instanceof RecurringRuleError || error instanceof RecipientError || error instanceof ReconciliationError) {
     writeApiError(response, 400, 'RECURRING_RULE_INVALID', error.message, requestId);
     return;
   }
@@ -312,6 +313,18 @@ const server = createServer((request, response) => {
   }
   if (method === 'POST' && path === '/v1/recurring-rules/delete') {
     readJsonBody(request).then(async body => { const owner = asString(body.owner); const id = asString(body.id); if (!owner || !id) { writeApiError(response, 400, 'INVALID_REQUEST', 'owner and id are required', requestId); return; } await deleteRecurringRule(owner, id); writeJson(response, 200, { ok: true }, requestId); }).catch((error: unknown) => writeRecurringRuleError(response, error, requestId)); return;
+  }
+  if (method === 'GET' && path === '/v1/recurring-rules/due') {
+    const owner = new URL(request.url || '/', 'http://localhost').searchParams.get('owner');
+    if (!owner) { writeApiError(response, 400, 'OWNER_REQUIRED', 'owner is required', requestId); return; }
+    listDueRecurringRules(owner).then(due => writeJson(response, 200, { due }, requestId)).catch((error: unknown) => writeRecurringRuleError(response, error, requestId));
+    return;
+  }
+  if (method === 'POST' && path === '/v1/recurring-rules/mark-triggered') {
+    readJsonBody(request).then(async body => { const owner = asString(body.owner); const id = asString(body.id); if (!owner || !id) { writeApiError(response, 400, 'INVALID_REQUEST', 'owner and id are required', requestId); return; } await markRecurringRuleTriggered(owner, id); writeJson(response, 200, { ok: true }, requestId); }).catch((error: unknown) => writeRecurringRuleError(response, error, requestId)); return;
+  }
+  if (method === 'POST' && path === '/v1/recurring-rules/skip') {
+    readJsonBody(request).then(async body => { const owner = asString(body.owner); const id = asString(body.id); if (!owner || !id) { writeApiError(response, 400, 'INVALID_REQUEST', 'owner and id are required', requestId); return; } await skipRecurringRule(owner, id); writeJson(response, 200, { ok: true }, requestId); }).catch((error: unknown) => writeRecurringRuleError(response, error, requestId)); return;
   }
 
   if (method === 'POST' && (path === '/v1/recipients' || path === '/v1/recipients/update')) {

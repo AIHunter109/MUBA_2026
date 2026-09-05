@@ -90,7 +90,13 @@ function shortAddress(address: string): string {
 
 function describeManual(input: ManualInput): string {
   const name = input.recipient?.name ?? shortAddress(input.address);
-  return `Send ${input.amount} ${input.asset} to ${name}`;
+  const when =
+    input.frequency === 'MONTHLY'
+      ? ` every month on day ${input.monthlyDay ?? new Date().getDate()}`
+      : input.frequency === 'DAILY'
+        ? ' every day'
+        : '';
+  return `Send ${input.amount} ${input.asset} to ${name}${when}`;
 }
 
 function summaryLine(plan: ResolvedPlan): string {

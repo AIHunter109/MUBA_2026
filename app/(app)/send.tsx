@@ -38,8 +38,8 @@ export default function SendScreen() {
         recipientNameFromMessage: false,
         amount: input.amount,
         asset: input.asset,
-        frequency: 'ONE_TIME',
-        monthlyDay: null,
+        frequency: input.frequency,
+        monthlyDay: input.monthlyDay,
         note: null,
       };
       return assessManualPlan(owner, plan);

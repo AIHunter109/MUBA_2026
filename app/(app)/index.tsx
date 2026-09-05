@@ -4,12 +4,16 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, useWindowDimensions, View } from 'react-native';
 import { Text } from '@/components/translated-text';
 
+import { DuePaymentCard, type DueRecurringRule } from '@/components/due-payment-card';
 import { Screen } from '@/components/screen';
 import { useAuth } from '@/lib/auth/auth-context';
-import { apiGet } from '@/lib/sui/api';
-import { fromBaseUnits, SUI_COIN, SUPPORTED_COINS, toBaseUnits, USDC_COIN } from '@/lib/sui/coins';
-import { getTransactionLedger, type TransactionRecord } from '@/lib/transactions/ledger';
 import { useI18n } from '@/lib/i18n/i18n-context';
+import { confirmAndExecute } from '@/lib/intent/client';
+import { apiGet, apiPost } from '@/lib/sui/api';
+import { fromBaseUnits, SUI_COIN, SUPPORTED_COINS, toBaseUnits, USDC_COIN } from '@/lib/sui/coins';
+import { SUI_NETWORK } from '@/lib/sui/network';
+import { getTransactionLedger, saveSettledTransaction, type TransactionRecord } from '@/lib/transactions/ledger';
+import type { ResolvedPlan } from '@/shared/contracts';
 
 type BalanceRow = { coinType: string; symbol: string; decimals: number; balance: string };
 type BalanceApiResponse = { balances: BalanceRow[]; offline?: boolean };
@@ -122,6 +126,13 @@ async function fetchRecurringRules(address: string): Promise<RecurringRule[]> {
   return rules;
 }
 
+async function fetchDueRecurringRules(address: string): Promise<DueRecurringRule[]> {
+  const { due } = await apiGet<{ due: DueRecurringRule[] }>(
+    `/v1/recurring-rules/due?owner=${encodeURIComponent(address)}`,
+  );
+  return due;
+}
+
 function mergeTransactions(...ledgers: TransactionRecord[][]): TransactionRecord[] {
   const byDigest = new Map<string, TransactionRecord>();
   for (const ledger of ledgers) {
@@ -133,12 +144,13 @@ function mergeTransactions(...ledgers: TransactionRecord[][]): TransactionRecord
 }
 
 export default function HomeScreen() {
-  const { session, signOut } = useAuth();
+  const { session, signOut, getSigner } = useAuth();
   const { t, language } = useI18n();
   const [balances, setBalances] = useState<BalanceRow[] | null>(null);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [recurringRules, setRecurringRules] = useState<RecurringRule[]>([]);
+  const [dueRules, setDueRules] = useState<DueRecurringRule[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { width } = useWindowDimensions();
 
@@ -155,8 +167,10 @@ export default function HomeScreen() {
       // copy as an offline fallback if the API is temporarily unavailable.
       const storedTransactions = await fetchStoredTransactions(address).catch(() => []);
       const storedRules = await fetchRecurringRules(address).catch(() => []);
+      const storedDue = await fetchDueRecurringRules(address).catch(() => []);
       setTransactions(mergeTransactions(localTransactions, storedTransactions));
       setRecurringRules(storedRules);
+      setDueRules(storedDue);
       setBalances(await fetchBalances(address));
       setBalanceError(null);
     } catch (error) {
@@ -172,6 +186,74 @@ export default function HomeScreen() {
     useCallback(() => {
       void refresh();
     }, [refresh]),
+  );
+
+  const sendDuePayment = useCallback(
+    async (rule: DueRecurringRule, amount: string) => {
+      if (!address) {
+        return;
+      }
+      const signer = await getSigner();
+      const coin = SUPPORTED_COINS.find((c) => c.symbol === rule.asset) ?? USDC_COIN;
+      const plan: ResolvedPlan = {
+        recipientName: rule.recipientName,
+        recipientAddress: rule.recipientAddress,
+        recipientKnown: true,
+        recipientNameFromMessage: false,
+        amount: Number(amount),
+        asset: rule.asset,
+        // This one firing is a single transfer; the recurring schedule itself
+        // lives on the rule row and is advanced separately below.
+        frequency: 'ONE_TIME',
+        monthlyDay: null,
+        note: null,
+      };
+      const outcome = await confirmAndExecute(signer, plan);
+      if (outcome.status !== 'success') {
+        throw new Error(outcome.error ?? 'Transfer failed.');
+      }
+      try {
+        await saveSettledTransaction({
+          id: outcome.digest,
+          digest: outcome.digest,
+          recipient: rule.recipientAddress,
+          amountBaseUnits: toBaseUnits(amount, coin.decimals).toString(),
+          coinType: coin.type,
+          symbol: coin.symbol,
+          decimals: coin.decimals,
+          occurredAt: new Date().toISOString(),
+          status: 'success',
+        });
+      } catch {
+        // The settled on-chain transfer is what matters; the local cache is best-effort.
+      }
+      try {
+        await apiPost('/v1/transactions', {
+          owner: address,
+          digest: outcome.digest,
+          recipient: rule.recipientAddress,
+          amount,
+          asset: rule.asset,
+          network: SUI_NETWORK,
+        });
+      } catch {
+        // The rule still advances below even if this ledger post fails.
+      }
+      await apiPost('/v1/recurring-rules/mark-triggered', { owner: address, id: rule.id });
+      await refresh();
+    },
+    [address, getSigner, refresh],
+  );
+
+  const skipDuePayment = useCallback(
+    async (rule: DueRecurringRule) => {
+      if (!address) {
+        return;
+      }
+      await apiPost('/v1/recurring-rules/skip', { owner: address, id: rule.id });
+      await refresh();
+    },
+    [address, refresh],
   );
 
   if (!session) {
@@ -322,6 +404,14 @@ export default function HomeScreen() {
           )}
         </View>
       </View>
+
+      {dueRules.length > 0 ? (
+        <View className="gap-3">
+          {dueRules.map((rule) => (
+            <DuePaymentCard key={rule.id} rule={rule} onSend={sendDuePayment} onSkip={skipDuePayment} />
+          ))}
+        </View>
+      ) : null}
 
       <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
         <View className="flex-row items-center gap-2">

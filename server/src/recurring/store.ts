@@ -3,7 +3,7 @@ import { isValidSuiAddress, normalizeSuiAddress } from '@mysten/sui/utils';
 import { prisma } from '../db';
 import { resolveUserId } from '../recipients/store';
 
-type RecurringFrequency = 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+export type RecurringFrequency = 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 
 export type RecurringRuleDto = {
   id: string;
@@ -17,8 +17,14 @@ export type RecurringRuleDto = {
 
 export class RecurringRuleError extends Error {}
 
-function nextTriggerAt(frequency: RecurringFrequency, monthlyDay: number): Date {
-  const next = new Date();
+/**
+ * Advances a trigger date forward by one period, from an arbitrary base date -
+ * shared by both "schedule the first occurrence from now" (below) and
+ * "advance past the occurrence that just fired or was skipped" (reconciliation.ts),
+ * so the two never drift apart on the day-math.
+ */
+export function advanceTrigger(from: Date, frequency: RecurringFrequency, monthlyDay: number): Date {
+  const next = new Date(from);
   next.setHours(9, 0, 0, 0);
   if (frequency === 'DAILY') {
     next.setDate(next.getDate() + 1);
@@ -32,11 +38,20 @@ function nextTriggerAt(frequency: RecurringFrequency, monthlyDay: number): Date 
     next.setDate(next.getDate() + 14);
     return next;
   }
+  next.setMonth(next.getMonth() + 1);
   next.setDate(monthlyDay);
-  if (next <= new Date()) {
-    next.setMonth(next.getMonth() + 1);
-  }
   return next;
+}
+
+function nextTriggerAt(frequency: RecurringFrequency, monthlyDay: number): Date {
+  const now = new Date();
+  const candidate = new Date(now);
+  candidate.setHours(9, 0, 0, 0);
+  if (frequency !== 'MONTHLY') {
+    return advanceTrigger(now, frequency, monthlyDay);
+  }
+  candidate.setDate(monthlyDay);
+  return candidate <= now ? advanceTrigger(now, frequency, monthlyDay) : candidate;
 }
 
 function validate(input: { recipient: string; amount: string; asset: string; frequency: string }): {
