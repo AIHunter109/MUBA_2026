@@ -17,6 +17,7 @@
   ],
   "exclude": [
     "app-example",
-    "reference"
+    "reference",
+    "server"
   ]
 }

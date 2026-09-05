@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect } from 'expo-router';
-import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { useI18n } from '@/lib/i18n/i18n-context';
@@ -21,24 +21,24 @@ export default function AppLayout() {
   return (
     <NativeTabs tintColor="#60a5fa">
       <NativeTabs.Trigger name="index">
-        <Label>{t('home')}</Label>
-        <Icon sf="house.fill" androidSrc={<VectorIcon family={Ionicons} name="home" />} />
+        <NativeTabs.Trigger.Label>{t('home')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="house.fill" src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="home" />} />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="send">
-        <Label>{t('send')}</Label>
-        <Icon sf="paperplane.fill" androidSrc={<VectorIcon family={Ionicons} name="paper-plane" />} />
+        <NativeTabs.Trigger.Label>{t('send')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="paperplane.fill" src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="paper-plane" />} />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="recipients">
-        <Label>{t('recipients')}</Label>
-        <Icon sf="person.2.fill" androidSrc={<VectorIcon family={Ionicons} name="people" />} />
+        <NativeTabs.Trigger.Label>{t('recipients')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="person.2.fill" src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="people" />} />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="history">
-        <Label>{t('history')}</Label>
-        <Icon sf="clock.fill" androidSrc={<VectorIcon family={Ionicons} name="time" />} />
+        <NativeTabs.Trigger.Label>{t('history')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="clock.fill" src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="time" />} />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
-        <Label>{t('settings')}</Label>
-        <Icon sf="gearshape.fill" androidSrc={<VectorIcon family={Ionicons} name="settings" />} />
+        <NativeTabs.Trigger.Label>{t('settings')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="gearshape.fill" src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="settings" />} />
       </NativeTabs.Trigger>
     </NativeTabs>
   );

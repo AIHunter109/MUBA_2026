@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, Text, View } from 'react-native';
 
 export type TraceStepStatus = 'pending' | 'active' | 'done' | 'error';
@@ -58,7 +58,12 @@ export function ReasoningTrace({ title, steps }: { title?: string; steps: TraceS
 }
 
 function StepDot({ status }: { status: TraceStepStatus }) {
-  const pulse = useRef(new Animated.Value(0)).current;
+  // A plain useState lazy-initializer (never calling its setter) holds this
+  // stable mutable Animated.Value across renders - RN's Animated API mutates
+  // it imperatively outside React's render cycle by design, so reading and
+  // interpolating it here isn't the "stale ref during render" pattern the
+  // lint rule targets.
+  const [pulse] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (status !== 'active') {

@@ -14,22 +14,23 @@ export default function SettingsScreen() {
   const languageListHeight = Math.min(224, Math.max(128, height * 0.26));
   const [isRequesting, setIsRequesting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const walletAddress = session?.walletAddress;
 
   const requestGas = useCallback(async () => {
-    if (!session?.walletAddress) {
+    if (!walletAddress) {
       return;
     }
     setIsRequesting(true);
     setNotice(null);
     try {
-      await requestTestnetSui(session.walletAddress);
+      await requestTestnetSui(walletAddress);
       setNotice('Testnet SUI requested. It should arrive in a few seconds.');
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Faucet request failed.');
     } finally {
       setIsRequesting(false);
     }
-  }, [session?.walletAddress]);
+  }, [walletAddress]);
 
   return (
     <AppPage title={t('settings')} subtitle="Configure approval safeguards and account preferences.">

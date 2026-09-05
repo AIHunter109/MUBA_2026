@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { isValidSuiAddress } from '@mysten/sui/utils';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import type { Recipient } from '@/lib/recipients/use-recipients';
@@ -34,14 +34,20 @@ export function ManualSheet({
   const [asset, setAsset] = useState<TransferAsset>('USDC');
   const [amount, setAmount] = useState('');
 
-  useEffect(() => {
+  // Reset the form fresh every time the sheet opens. Adjusting state during
+  // render (guarded by comparing against the previous prop) rather than in a
+  // useEffect - React re-renders with the reset values before anything is
+  // ever painted, so there's no flash of stale data.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
     if (visible) {
       setPicked(null);
       setAddress('');
       setAsset('USDC');
       setAmount('');
     }
-  }, [visible]);
+  }
 
   const resolvedAddress = picked?.address ?? address.trim();
   const valid = (picked != null || isValidSuiAddress(address.trim())) && Number(amount) > 0;
