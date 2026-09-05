@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
+import { Button, Card, Subtitle, Title } from '@/components/ui';
+import { c } from '@/lib/design/tokens';
 
 export function AppPage({
   title,
@@ -14,15 +16,20 @@ export function AppPage({
 }) {
   return (
     <Screen>
-      <View className="gap-1">
-        <Text className="text-3xl font-bold tracking-tight text-white">{title}</Text>
-        <Text className="text-sm leading-5 text-slate-400">{subtitle}</Text>
+      <View className="gap-2">
+        <Title>{title}</Title>
+        <Subtitle>{subtitle}</Subtitle>
       </View>
       {children}
     </Screen>
   );
 }
 
+/**
+ * A section that is designed but not yet wired up. It says so plainly rather
+ * than pretending - a disabled control is more honest than one that silently
+ * does nothing.
+ */
 export function PlaceholderCard({
   title,
   detail,
@@ -33,18 +40,15 @@ export function PlaceholderCard({
   action?: string;
 }) {
   return (
-    <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-      <Text className="text-base font-semibold text-white">{title}</Text>
-      <Text className="text-sm leading-5 text-slate-400">{detail}</Text>
-      {action ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => undefined}
-          className="self-start rounded-lg border border-blue-400/30 bg-blue-400/10 px-4 py-2.5"
-        >
-          <Text className="text-sm font-semibold text-blue-300">{action}</Text>
-        </Pressable>
-      ) : null}
-    </View>
+    <Card className="gap-3">
+      <View className="flex-row items-center justify-between gap-3">
+        <Text className={`text-[15px] font-semibold ${c.textInk}`}>{title}</Text>
+        <Text className={`text-[10px] font-medium uppercase tracking-[1px] ${c.textInk3}`}>
+          Not built yet
+        </Text>
+      </View>
+      <Text className={`text-[13px] leading-[20px] ${c.textInk2}`}>{detail}</Text>
+      {action ? <Button label={action} variant="secondary" disabled className="self-start" /> : null}
+    </Card>
   );
 }

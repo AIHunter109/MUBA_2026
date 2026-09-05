@@ -1,29 +1,47 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Link, useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, Text, View } from 'react-native';
+import { Linking, RefreshControl, Text, View } from 'react-native';
 
+import { ActivityList } from '@/components/activity-list';
+import { BalanceCard } from '@/components/balance-card';
+import { MonthlyChart } from '@/components/monthly-chart';
 import { Screen } from '@/components/screen';
+import {
+  ActionTile,
+  Button,
+  Card,
+  InlineLink,
+  Notice,
+  SectionHeading,
+  Sheet,
+  Stat,
+} from '@/components/ui';
+import { Wordmark } from '@/components/wordmark';
+import { useActivity } from '@/lib/activity/use-activity';
 import { useAuth } from '@/lib/auth/auth-context';
+import { copyOrShare, copyVerb } from '@/lib/design/share-text';
+import { c, mono, palette } from '@/lib/design/tokens';
+import { useLayout } from '@/lib/design/use-layout';
+import { formatSui, formatUsd } from '@/lib/format';
 import { apiGet } from '@/lib/sui/api';
-import { fromBaseUnits, SUI_COIN, SUPPORTED_COINS, USDC_COIN } from '@/lib/sui/coins';
+import { SUI_COIN, SUPPORTED_COINS, USDC_COIN } from '@/lib/sui/coins';
+import { WEB_FAUCET_URL } from '@/lib/sui/faucet';
 
 type BalanceRow = { coinType: string; symbol: string; decimals: number; balance: string };
 
-async function fetchBalances(address: string): Promise<BalanceRow[]> {
-  const { balances } = await apiGet<{ balances: BalanceRow[] }>(
-    `/v1/balances?owner=${encodeURIComponent(address)}`,
-  );
-  return balances;
-}
-
 export default function HomeScreen() {
-  const { session, signOut } = useAuth();
+  const { session } = useAuth();
+  const { hasSideNav, isWide } = useLayout();
+  const router = useRouter();
+
   const [balances, setBalances] = useState<BalanceRow[] | null>(null);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
 
   const address = session?.walletAddress;
+  const activity = useActivity();
 
   const refresh = useCallback(async () => {
     if (!address) {
@@ -31,7 +49,10 @@ export default function HomeScreen() {
     }
     setIsRefreshing(true);
     try {
-      setBalances(await fetchBalances(address));
+      const { balances: rows } = await apiGet<{ balances: BalanceRow[] }>(
+        `/v1/balances?owner=${encodeURIComponent(address)}`,
+      );
+      setBalances(rows);
       setBalanceError(null);
     } catch (error) {
       setBalanceError(
@@ -40,203 +61,179 @@ export default function HomeScreen() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [address]);
+    await activity.refresh();
+  }, [address, activity]);
 
   useFocusEffect(
     useCallback(() => {
       void refresh();
-    }, [refresh]),
+      // Refetching on every focus keeps the balance honest without a socket.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [address]),
   );
+
+  const copyAddress = useCallback(async () => {
+    if (!address) {
+      return;
+    }
+    try {
+      const verb = await copyOrShare(address, 'My Sui address');
+      setCopyNotice(verb === 'copied' ? 'Address copied.' : 'Address shared.');
+    } catch (error) {
+      setCopyNotice(error instanceof Error ? error.message : 'Could not copy the address.');
+    }
+  }, [address]);
 
   if (!session) {
     return null;
   }
 
-  const displayBalances = SUPPORTED_COINS.map(
-    (coin) =>
-      balances?.find((row) => row.coinType === coin.type) ?? {
-        coinType: coin.type,
-        symbol: coin.symbol,
-        decimals: coin.decimals,
-        balance: '0',
-      },
-  );
-  const usdcBalance = displayBalances.find((row) => row.symbol === USDC_COIN.symbol);
-  const suiBalance = displayBalances.find((row) => row.symbol === SUI_COIN.symbol);
+  const find = (symbol: string) => {
+    const coin = SUPPORTED_COINS.find((entry) => entry.symbol === symbol);
+    const row = balances?.find((entry) => entry.symbol === symbol);
+    if (!coin) {
+      return null;
+    }
+    return row ? BigInt(row.balance) : balances ? 0n : null;
+  };
+
+  const usdc = find(USDC_COIN.symbol);
+  const sui = find(SUI_COIN.symbol);
+  const recent = (activity.items ?? []).slice(0, 5);
 
   return (
     <Screen
       refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor="#94a3b8" />
+        <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={palette.ink3} />
       }
     >
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-3">
-          <View className="h-10 w-10 items-center justify-center rounded-xl bg-blue-600">
-            <Text className="text-lg font-bold text-white">R</Text>
-          </View>
-          <View>
-            <Text className="text-lg font-bold tracking-tight text-white">RemitGuard</Text>
-            <Text className="text-[10px] font-medium uppercase tracking-widest text-slate-500">
-              on Sui
-            </Text>
-          </View>
-        </View>
-        <View className="flex-row items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5">
-          <View className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          <Text className="text-xs font-semibold text-emerald-300">Safety on</Text>
-        </View>
-      </View>
-
-      <View className="max-w-2xl gap-1 pt-1">
-        <Text className="text-xs font-semibold uppercase tracking-widest text-blue-300">
-          Your remittance desk
-        </Text>
-        <Text className="text-2xl font-bold tracking-tight text-white md:text-3xl">
-          Good to see you, {session.displayName.split(' ')[0]}
-        </Text>
-        <Text className="max-w-xl text-sm leading-5 text-slate-400">
-          Plan, review, and send support across borders with confidence.
-        </Text>
-      </View>
-
-      <View className="gap-4 md:flex-row md:items-stretch">
-        <View className="w-full gap-4 rounded-3xl border border-blue-400/20 bg-slate-900 p-5 md:flex-1 md:p-6">
-          <View className="flex-row items-center justify-between">
-            <View>
-              <Text className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                Available balance
+      <View className="gap-4">
+        <View className="flex-row items-center justify-between gap-4">
+          {hasSideNav ? <View /> : <Wordmark />}
+          <View className="flex-row items-center gap-4">
+            <View className="items-end gap-0.5">
+              <Text className={`text-[10px] font-medium uppercase tracking-[1px] ${c.textInk3}`}>
+                Welcome back
               </Text>
-              <Text className="mt-1 text-sm text-slate-400">Ready for your next transfer</Text>
+              <Text className={`text-[14px] font-semibold ${c.textInk}`} numberOfLines={1}>
+                {session.displayName}
+              </Text>
             </View>
-            <View className="rounded-full bg-blue-400/10 px-3 py-1.5">
-              <Text className="text-xs font-semibold text-blue-300">Sui testnet</Text>
-            </View>
-          </View>
-
-          {balances === null ? (
-            balanceError ? (
-              <Text className="text-sm leading-5 text-amber-200">{balanceError}</Text>
-            ) : (
-              <ActivityIndicator color="#94a3b8" />
-            )
-          ) : (
-            <View className="gap-3">
-              {usdcBalance ? (
-                <View>
-                  <Text className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-                    {fromBaseUnits(BigInt(usdcBalance.balance), usdcBalance.decimals)}
-                  </Text>
-                  <Text className="mt-1 text-sm font-semibold text-blue-300">USDC</Text>
-                </View>
-              ) : null}
-              {suiBalance ? (
-                <View className="flex-row items-baseline justify-between border-t border-slate-800 pt-3">
-                  <Text className="text-lg font-semibold text-slate-300">
-                    {fromBaseUnits(BigInt(suiBalance.balance), suiBalance.decimals)}{' '}
-                    <Text className="text-sm text-slate-500">SUI</Text>
-                  </Text>
-                  <Text className="text-xs text-slate-500">Network gas</Text>
-                </View>
-              ) : null}
-            </View>
-          )}
-
-          <View className="flex-row gap-2 pt-1">
-            <Link href="/(app)/send" asChild>
-              <Pressable className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 active:bg-blue-500">
-                <Ionicons name="arrow-up-outline" size={18} color="#ffffff" />
-                <Text className="font-bold text-white">Send money</Text>
-              </Pressable>
-            </Link>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => Alert.alert('Receive USDC', session.walletAddress)}
-              className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-3 active:bg-slate-800"
-            >
-              <Ionicons name="arrow-down-outline" size={18} color="#94a3b8" />
-              <Text className="font-semibold text-slate-200">Receive</Text>
-            </Pressable>
+            {hasSideNav ? (
+              <Button
+                label="Account"
+                variant="secondary"
+                onPress={() => router.push('/(app)/settings')}
+              />
+            ) : null}
           </View>
         </View>
+        <View className="h-px w-full bg-[#111110]" />
+      </View>
 
-        <View className="w-full gap-3 rounded-3xl border border-slate-800 bg-slate-900/70 p-5 md:flex-1 md:p-6">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2">
-              <Ionicons name="receipt-outline" size={20} color="#60a5fa" />
-              <Text className="text-base font-bold text-white">Recent transactions</Text>
-            </View>
-            <Link href="/(app)/history">
-              <Text className="text-sm font-semibold text-blue-400">View all</Text>
-            </Link>
-          </View>
-          <EmptyState
-            title="No transactions yet"
-            detail="Your first confirmed transfer will show up here."
+      {balanceError ? <Notice tone="warn">{balanceError}</Notice> : null}
+      {copyNotice ? <Notice tone="info">{copyNotice}</Notice> : null}
+
+      <View className={`gap-6 ${isWide ? 'flex-row items-start' : ''}`}>
+        {/* Left: the wallet itself. */}
+        <View className={`gap-4 ${isWide ? 'w-[380px]' : 'w-full'}`}>
+          <BalanceCard
+            holderName={session.displayName}
+            address={session.walletAddress}
+            usdc={usdc}
+            sui={sui}
+            loading={balances === null && !balanceError}
+            onCopyAddress={() => void copyAddress()}
           />
+
+          <View className="flex-row flex-wrap items-center justify-between gap-2">
+            <Text className={`text-[12.5px] ${c.textInk2}`}>
+              {copyVerb} the address, then claim testnet SUI.
+            </Text>
+            <InlineLink
+              label="Open the faucet"
+              external
+              onPress={() => void Linking.openURL(WEB_FAUCET_URL)}
+            />
+          </View>
+
+          <View className="flex-row gap-2">
+            <ActionTile icon="arrow-up" label="Send" primary onPress={() => router.push('/(app)/send')} />
+            <ActionTile icon="arrow-down" label="Receive" onPress={() => setReceiveOpen(true)} />
+            <ActionTile
+              icon="people-outline"
+              label="Recipients"
+              onPress={() => router.push('/(app)/recipients')}
+            />
+            <ActionTile
+              icon="receipt-outline"
+              label="History"
+              onPress={() => router.push('/(app)/history')}
+            />
+          </View>
+        </View>
+
+        {/* Right: what the wallet has been doing. */}
+        <View className="flex-1 gap-6">
+          <View className="flex-row flex-wrap gap-3">
+            <Stat label="Sent" value={formatUsd(activity.stats.usdcSent)} hint="USDC, all time" />
+            <Stat
+              label="Transfers"
+              value={String(activity.stats.transfers)}
+              hint="Settled payments"
+            />
+            <Stat
+              label="Fees paid"
+              value={`${formatSui(activity.stats.fees)} SUI`}
+              hint="Network gas"
+            />
+          </View>
+
+          <Card>
+            <MonthlyChart months={activity.monthly} />
+          </Card>
         </View>
       </View>
 
-      <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-        <View className="flex-row items-center gap-2">
-          <Ionicons name="calendar-outline" size={20} color="#34d399" />
-          <Text className="text-base font-bold text-white">Upcoming payments</Text>
-        </View>
-        <EmptyState
-          title="No upcoming payments"
-          detail="Your confirmed recurring plans will appear here."
+      <View className="gap-1">
+        <SectionHeading
+          title="Activity"
+          action={{ label: 'View all', onPress: () => router.push('/(app)/history') }}
         />
-      </View>
-
-      <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-base font-bold text-white md:text-lg">This month</Text>
-          <Text className="text-xs text-slate-500">Payment summary</Text>
-        </View>
-        <EmptyState
-          title="No transactions this month"
-          detail="Your monthly totals will appear after your first transfer."
-        />
-      </View>
-
-      <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-        <View className="flex-row items-center gap-2">
-          <Ionicons name="shield-checkmark-outline" size={20} color="#34d399" />
-          <Text className="text-base font-bold text-white">RemitGuard AI insight</Text>
-        </View>
-        <Text className="text-sm leading-5 text-slate-400">
-          AI safety check is ready. No transfer currently requires a heuristic risk review.
-        </Text>
+        {activity.error ? (
+          <View className="pt-4">
+            <Notice tone="warn">{activity.error}</Notice>
+          </View>
+        ) : (
+          <ActivityList items={recent} />
+        )}
       </View>
 
       {session.isDemo ? (
-        <View className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-          <Text className="text-sm leading-5 text-amber-200">
-            Demo session. This wallet was generated locally on this device and is not linked to a
-            Google account.
-          </Text>
-        </View>
+        <Notice tone="info">
+          Demo session. This wallet was generated locally on this device and is not linked to a
+          Google account.
+        </Notice>
       ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Sign out"
-        onPress={() => {
-          void signOut();
-        }}
-        className="items-center rounded-xl border border-slate-700 px-5 py-4 active:bg-slate-800"
-      >
-        <Text className="text-base font-semibold text-slate-300">Sign out</Text>
-      </Pressable>
+      <Sheet visible={receiveOpen} title="Receive USDC" onClose={() => setReceiveOpen(false)}>
+        <Text className={`text-[13px] leading-[20px] ${c.textInk2}`}>
+          Anyone can send USDC or SUI to this address on Sui testnet.
+        </Text>
+        <View className={`rounded-[8px] border p-3 ${c.hairline} ${c.bgWhite}`}>
+          <Text style={[mono, { fontSize: 12 }]} className={c.textInk} selectable>
+            {session.walletAddress}
+          </Text>
+        </View>
+        <Button
+          label={`${copyVerb} address`}
+          icon="copy-outline"
+          onPress={() => {
+            void copyAddress();
+            setReceiveOpen(false);
+          }}
+        />
+      </Sheet>
     </Screen>
-  );
-}
-
-function EmptyState({ title, detail }: { title: string; detail: string }) {
-  return (
-    <View className="items-center gap-1 rounded-2xl border border-dashed border-slate-800 bg-slate-900/30 px-5 py-6">
-      <Text className="text-sm font-semibold text-slate-300">{title}</Text>
-      <Text className="text-center text-xs leading-5 text-slate-500">{detail}</Text>
-    </View>
   );
 }

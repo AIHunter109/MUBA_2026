@@ -17,7 +17,7 @@ export default function AppLayout() {
 
   // Android's native bottom bar allows at most 5 visible tabs.
   return (
-    <NativeTabs tintColor="#60a5fa">
+    <NativeTabs tintColor="#E03A17">
       <NativeTabs.Trigger name="index">
         <Label>Home</Label>
         <Icon sf="house.fill" androidSrc={<VectorIcon family={Ionicons} name="home" />} />

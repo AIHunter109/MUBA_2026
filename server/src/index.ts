@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 import { resolvedPlanSchema } from '../../shared/contracts';
+import { getActivity } from './activity';
 import { loadEnvironment } from './config';
 import { writeApiError, writeJson } from './errors';
 import {
@@ -112,6 +113,32 @@ const server = createServer((request, response) => {
       .then((balances) => writeJson(response, 200, { owner, balances }, requestId))
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Unable to read balances';
+        const invalid = message === 'Invalid Sui address';
+        writeApiError(
+          response,
+          invalid ? 400 : 502,
+          invalid ? 'INVALID_ADDRESS' : 'SUI_READ_FAILED',
+          message,
+          requestId,
+        );
+      });
+    return;
+  }
+
+  if (method === 'GET' && path === '/v1/activity') {
+    const query = new URL(request.url || '/', 'http://localhost').searchParams;
+    const owner = query.get('owner');
+    if (!owner) {
+      writeApiError(response, 400, 'OWNER_REQUIRED', 'An owner address is required', requestId);
+      return;
+    }
+    const requested = Number(query.get('limit'));
+    const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 100) : 40;
+
+    getActivity(suiClient, environment, owner, limit)
+      .then((activity) => writeJson(response, 200, { owner, activity }, requestId))
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unable to read activity';
         const invalid = message === 'Invalid Sui address';
         writeApiError(
           response,

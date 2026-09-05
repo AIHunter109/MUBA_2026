@@ -1,12 +1,14 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css";
- 
+
 @import "nativewind/theme";
 
 @layer base {
+  /* The page ground behind the app shell. Kept in sync with palette.paper. */
+  html,
   body {
-    background-color: #020617;
-    color: #f1f5f9;
+    background-color: #faf9f5;
+    color: #111110;
   }
 }

@@ -1,109 +1,143 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
+import {
+  Button,
+  Card,
+  Divider,
+  EmptyState,
+  Field,
+  Notice,
+  Sheet,
+  Subtitle,
+  Title,
+} from '@/components/ui';
+import { c, mono, palette } from '@/lib/design/tokens';
+import { shortAddress } from '@/lib/format';
 import { type Recipient, useRecipients } from '@/lib/recipients/use-recipients';
-
-function shortAddress(address: string): string {
-  return address.length > 14 ? `${address.slice(0, 8)}...${address.slice(-6)}` : address;
-}
 
 export default function RecipientsScreen() {
   const { recipients, isLoading, error, add, update, remove } = useRecipients();
   const [editing, setEditing] = useState<Recipient | 'new' | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Recipient | null>(null);
 
   return (
     <Screen>
-      <View className="flex-row items-center justify-between">
-        <View className="gap-1">
-          <Text className="text-3xl font-bold tracking-tight text-white">Recipients</Text>
-          <Text className="text-sm leading-5 text-slate-400">
-            Saved wallets your instructions can resolve by name.
-          </Text>
+      <View className="max-w-[760px] gap-6">
+        <View className="flex-row items-start justify-between gap-4">
+          <View className="flex-1 gap-2">
+            <Title>Recipients</Title>
+            <Subtitle>Saved wallets your instructions can resolve by name.</Subtitle>
+          </View>
+          <Button
+            label="Add"
+            icon="add"
+            onPress={() => setEditing('new')}
+            className="shrink-0"
+          />
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add recipient"
-          onPress={() => setEditing('new')}
-          className="h-10 w-10 items-center justify-center rounded-xl bg-blue-600 active:bg-blue-500"
-        >
-          <Ionicons name="add" size={22} color="#ffffff" />
-        </Pressable>
+
+        {editing ? (
+          <RecipientForm
+            initial={editing === 'new' ? null : editing}
+            onCancel={() => setEditing(null)}
+            onSubmit={async (name, address) => {
+              if (editing === 'new') {
+                await add(name, address);
+              } else {
+                await update(editing.id, name, address);
+              }
+              setEditing(null);
+            }}
+          />
+        ) : null}
+
+        {isLoading ? (
+          <ActivityIndicator color={palette.ink3} />
+        ) : error ? (
+          <Notice tone="warn">{error}</Notice>
+        ) : recipients.length === 0 && !editing ? (
+          <EmptyState
+            title="No saved recipients"
+            detail="Add a family member so “Send Mum 100 USDC” resolves to their wallet."
+          />
+        ) : (
+          <Card className="p-0">
+            {recipients.map((recipient, index) => (
+              <View key={recipient.id}>
+                {index > 0 ? <Divider /> : null}
+                <View className="flex-row items-center gap-3 p-4">
+                  <View className={`h-10 w-10 items-center justify-center rounded-[6px] ${c.bgStone}`}>
+                    <Text className={`text-[15px] font-semibold ${c.textInk}`}>
+                      {recipient.name.slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View className="flex-1 gap-0.5">
+                    <Text className={`text-[14px] font-semibold ${c.textInk}`}>{recipient.name}</Text>
+                    <Text style={[mono, { fontSize: 11 }]} className={c.textInk3}>
+                      {shortAddress(recipient.address, 10, 8)}
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit ${recipient.name}`}
+                    onPress={() => setEditing(recipient)}
+                    className="p-2 active:opacity-60"
+                  >
+                    <Ionicons name="create-outline" size={18} color={palette.ink2} />
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${recipient.name}`}
+                    onPress={() => setPendingDelete(recipient)}
+                    className="p-2 active:opacity-60"
+                  >
+                    <Ionicons name="trash-outline" size={18} color={palette.vermillion} />
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </Card>
+        )}
+
+        <Text className={`text-[12px] leading-[19px] ${c.textInk3}`}>
+          A transfer to an address that is not saved here is treated as a first-time recipient and
+          flagged for review.
+        </Text>
       </View>
 
-      {editing ? (
-        <RecipientForm
-          initial={editing === 'new' ? null : editing}
-          onCancel={() => setEditing(null)}
-          onSubmit={async (name, address) => {
-            if (editing === 'new') {
-              await add(name, address);
-            } else {
-              await update(editing.id, name, address);
-            }
-            setEditing(null);
-          }}
-        />
-      ) : null}
-
-      {isLoading ? (
-        <ActivityIndicator color="#94a3b8" />
-      ) : error ? (
-        <Text className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm leading-5 text-amber-200">
-          {error}
+      <Sheet
+        visible={pendingDelete !== null}
+        title="Delete recipient"
+        onClose={() => setPendingDelete(null)}
+      >
+        <Text className={`text-[13px] leading-[20px] ${c.textInk2}`}>
+          Remove {pendingDelete?.name}? Future payments to this address will be flagged as
+          first-time again.
         </Text>
-      ) : recipients.length === 0 && !editing ? (
-        <View className="items-center gap-1 rounded-2xl border border-dashed border-slate-800 bg-slate-900/30 px-5 py-8">
-          <Text className="text-sm font-semibold text-slate-300">No saved recipients</Text>
-          <Text className="text-center text-xs leading-5 text-slate-500">
-            Add a family member so &quot;Send Mum 100 USDC&quot; resolves to their wallet.
-          </Text>
-        </View>
-      ) : (
-        recipients.map((r) => (
-          <View
-            key={r.id}
-            className="flex-row items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4"
-          >
-            <View className="h-10 w-10 items-center justify-center rounded-full bg-slate-800">
-              <Text className="text-sm font-bold text-slate-300">
-                {r.name.slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
-            <View className="flex-1">
-              <Text className="text-base font-semibold text-white">{r.name}</Text>
-              <Text className="font-mono text-xs text-slate-500">{shortAddress(r.address)}</Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${r.name}`}
-              onPress={() => setEditing(r)}
-              className="p-2 active:opacity-60"
-            >
-              <Ionicons name="create-outline" size={18} color="#94a3b8" />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Delete ${r.name}`}
-              onPress={() =>
-                Alert.alert('Delete recipient', `Remove ${r.name}?`, [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => void remove(r.id) },
-                ])
+        <View className="flex-row gap-2">
+          <Button
+            label="Cancel"
+            variant="secondary"
+            onPress={() => setPendingDelete(null)}
+            className="flex-1"
+          />
+          <Button
+            label="Delete"
+            variant="danger"
+            onPress={() => {
+              const target = pendingDelete;
+              setPendingDelete(null);
+              if (target) {
+                void remove(target.id);
               }
-              className="p-2 active:opacity-60"
-            >
-              <Ionicons name="trash-outline" size={18} color="#f87171" />
-            </Pressable>
-          </View>
-        ))
-      )}
-
-      <Text className="text-xs leading-5 text-slate-500">
-        A transfer to an address that is not saved here is treated as a first-time recipient and
-        flagged for review.
-      </Text>
+            }}
+            className="flex-1"
+          />
+        </View>
+      </Sheet>
     </Screen>
   );
 }
@@ -135,45 +169,31 @@ function RecipientForm({
   }, [name, address, onSubmit]);
 
   return (
-    <View className="gap-3 rounded-2xl border border-blue-400/20 bg-slate-900 p-4">
-      <Text className="text-sm font-semibold text-white">
+    <Card className="gap-4">
+      <Text className={`text-[15px] font-semibold ${c.textInk}`}>
         {initial ? 'Edit recipient' : 'New recipient'}
       </Text>
-      <TextInput
-        value={name}
-        onChangeText={setName}
-        placeholder="Name (e.g. Mum)"
-        placeholderTextColor="#475569"
-        className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100"
-      />
-      <TextInput
+      <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Mum" />
+      <Field
+        label="Sui address"
         value={address}
         onChangeText={setAddress}
-        placeholder="0x..."
-        placeholderTextColor="#475569"
+        placeholder="0x…"
         autoCapitalize="none"
         autoCorrect={false}
-        className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 font-mono text-xs text-slate-100"
+        monospace
       />
-      {error ? <Text className="text-xs leading-5 text-red-400">{error}</Text> : null}
+      {error ? <Notice tone="error">{error}</Notice> : null}
       <View className="flex-row gap-2">
-        <Pressable
-          accessibilityRole="button"
-          onPress={onCancel}
-          className="flex-1 items-center rounded-xl border border-slate-700 px-4 py-3 active:bg-slate-800"
-        >
-          <Text className="text-sm font-semibold text-slate-300">Cancel</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          disabled={busy || name.trim().length === 0 || address.trim().length === 0}
+        <Button label="Cancel" variant="secondary" onPress={onCancel} className="flex-1" />
+        <Button
+          label="Save"
+          busy={busy}
+          disabled={name.trim().length === 0 || address.trim().length === 0}
           onPress={submit}
-          className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 active:bg-blue-500 disabled:opacity-50"
-        >
-          {busy ? <ActivityIndicator color="#ffffff" size="small" /> : null}
-          <Text className="text-sm font-bold text-white">Save</Text>
-        </Pressable>
+          className="flex-1"
+        />
       </View>
-    </View>
+    </Card>
   );
 }

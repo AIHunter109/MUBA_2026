@@ -1,142 +1,49 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
 
+import { Card, Divider, Eyebrow } from '@/components/ui';
+import { c, mono, palette } from '@/lib/design/tokens';
+import { shortAddress } from '@/lib/format';
 import type { IntentReview, SafetyFlag } from '@/shared/contracts';
 
-function shortAddress(address: string): string {
-  return address.length > 16 ? `${address.slice(0, 8)}...${address.slice(-6)}` : address;
-}
-
-const STATUS_STYLE: Record<IntentReview['status'], { label: string; className: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
+/**
+ * Verdict colour follows the palette rule: ink for a settled fact, saffron for
+ * something that wants a human's attention, vermillion for a hard stop.
+ */
+const STATUS = {
   ready: {
     label: 'Looks clear',
-    className: 'border-emerald-400/20 bg-emerald-400/10',
-    icon: 'checkmark-circle',
-    color: '#34d399',
+    icon: 'checkmark' as const,
+    fill: palette.ink,
+    tone: 'plain' as const,
   },
   needs_review: {
     label: 'Review before sending',
-    className: 'border-amber-400/20 bg-amber-400/10',
-    icon: 'alert-circle',
-    color: '#fbbf24',
+    icon: 'alert' as const,
+    fill: palette.saffron,
+    tone: 'saffron' as const,
   },
   cannot_execute: {
     label: 'Cannot send this',
-    className: 'border-red-400/20 bg-red-400/10',
-    icon: 'close-circle',
-    color: '#f87171',
+    icon: 'close' as const,
+    fill: palette.vermillion,
+    tone: 'vermillion' as const,
   },
 };
 
 function FlagRow({ flag }: { flag: SafetyFlag }) {
   const warn = flag.severity === 'warn';
   return (
-    <View className="flex-row gap-2">
+    <View className="flex-row gap-2.5">
       <Ionicons
         name={warn ? 'warning-outline' : 'information-circle-outline'}
-        size={16}
-        color={warn ? '#fbbf24' : '#60a5fa'}
+        size={15}
+        color={warn ? palette.saffronMid : palette.ink3}
+        style={{ marginTop: 2 }}
       />
-      <Text className={`flex-1 text-xs leading-5 ${warn ? 'text-amber-200' : 'text-slate-400'}`}>
+      <Text className={`flex-1 text-[12.5px] leading-[20px] ${warn ? c.textInk : c.textInk2}`}>
         {flag.detail}
       </Text>
-    </View>
-  );
-}
-
-export function IntentReviewCard({ review }: { review: IntentReview }) {
-  const status = STATUS_STYLE[review.status];
-  const { plan } = review;
-
-  return (
-    <View className="gap-4">
-      <View className={`flex-row items-center gap-2 rounded-2xl border p-4 ${status.className}`}>
-        <Ionicons name={status.icon} size={20} color={status.color} />
-        <Text className="flex-1 text-sm font-semibold text-white">{status.label}</Text>
-        {review.demo ? (
-          <Text className="text-[10px] font-medium uppercase tracking-widest text-slate-500">
-            fixture
-          </Text>
-        ) : null}
-      </View>
-
-      {plan ? (
-        <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <Row label="To">
-            <View className="flex-row items-center gap-2">
-              <Text className="text-sm font-semibold text-white">{plan.recipientName}</Text>
-              <View
-                className={`rounded-full px-2 py-0.5 ${plan.recipientKnown ? 'bg-emerald-400/10' : 'bg-amber-400/10'}`}
-              >
-                <Text
-                  className={`text-[10px] font-semibold ${plan.recipientKnown ? 'text-emerald-300' : 'text-amber-300'}`}
-                >
-                  {plan.recipientKnown ? 'saved' : 'first time'}
-                </Text>
-              </View>
-            </View>
-          </Row>
-          <Row label="Address">
-            <Text className="font-mono text-xs text-slate-300">{shortAddress(plan.recipientAddress)}</Text>
-          </Row>
-          <Row label="Amount">
-            <Text className="text-sm font-semibold text-white">
-              {plan.amount} {plan.asset}
-            </Text>
-          </Row>
-          <Row label="When">
-            <Text className="text-sm text-slate-300">
-              {plan.frequency === 'MONTHLY'
-                ? `Every month on day ${plan.monthlyDay ?? 1}`
-                : 'One time'}
-            </Text>
-          </Row>
-          {plan.note ? (
-            <Row label="Note">
-              <Text className="text-sm text-slate-400">{plan.note}</Text>
-            </Row>
-          ) : null}
-        </View>
-      ) : null}
-
-      {review.flags.length > 0 ? (
-        <View className="gap-2.5 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-          <Text className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-            Safety check
-          </Text>
-          {review.flags.map((flag) => (
-            <FlagRow key={flag.code} flag={flag} />
-          ))}
-        </View>
-      ) : null}
-
-      {review.modelReads.length > 0 ? (
-        <View className="gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-          <Text className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-            AI reads ({review.modelReads.length})
-          </Text>
-          {review.modelReads.map((read, index) => (
-            <View
-              key={read.role}
-              className={index === 0 ? 'gap-1' : 'gap-1 border-t border-slate-800 pt-3'}
-            >
-              <View className="flex-row items-center justify-between">
-                <Text className="text-xs font-semibold capitalize text-slate-300">{read.role}</Text>
-                <Text className="text-[10px] text-slate-600">
-                  {read.ok ? `${read.latencyMs}ms` : 'failed'}
-                </Text>
-              </View>
-              <Text className="text-[11px] text-slate-500">{read.model}</Text>
-              {read.requestId ? (
-                <Text className="font-mono text-[10px] text-slate-600">{read.requestId}</Text>
-              ) : null}
-              <Text className="text-xs leading-5 text-slate-400">
-                {read.intent?.rationale ?? read.error ?? 'No rationale'}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -144,8 +51,122 @@ export function IntentReviewCard({ review }: { review: IntentReview }) {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View className="flex-row items-start justify-between gap-4">
-      <Text className="text-xs font-medium uppercase tracking-widest text-slate-500">{label}</Text>
+      <Eyebrow>{label}</Eyebrow>
       <View className="flex-1 items-end">{children}</View>
+    </View>
+  );
+}
+
+export function IntentReviewCard({ review }: { review: IntentReview }) {
+  const status = STATUS[review.status];
+  const { plan } = review;
+
+  return (
+    <View className="gap-4">
+      <View
+        className={`flex-row items-center gap-3 rounded-[10px] border p-4 ${
+          status.tone === 'saffron'
+            ? `${c.bgSaffronTint} ${c.borderSaffron}`
+            : status.tone === 'vermillion'
+              ? `${c.bgVermillionTint} ${c.borderVermillion}`
+              : `${c.bgPaper2} ${c.hairline}`
+        }`}
+      >
+        <View
+          className="h-7 w-7 items-center justify-center rounded-[5px]"
+          style={{ backgroundColor: status.fill }}
+        >
+          <Ionicons
+            name={status.icon}
+            size={16}
+            color={status.tone === 'saffron' ? palette.saffronDeep : palette.paper}
+          />
+        </View>
+        <Text className={`flex-1 text-[14px] font-semibold ${c.textInk}`}>{status.label}</Text>
+        {review.demo ? <Eyebrow>fixture</Eyebrow> : null}
+      </View>
+
+      {plan ? (
+        <Card className="gap-4">
+          <Row label="To">
+            <View className="flex-row items-center gap-2">
+              <Text className={`text-[14px] font-semibold ${c.textInk}`}>{plan.recipientName}</Text>
+              <Text
+                className={`overflow-hidden rounded-[4px] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.5px] ${
+                  plan.recipientKnown ? `${c.bgStone} ${c.textInk2}` : `${c.bgSaffron} ${c.textSaffronDeep}`
+                }`}
+              >
+                {plan.recipientKnown ? 'saved' : 'first time'}
+              </Text>
+            </View>
+          </Row>
+          <Divider />
+          <Row label="Address">
+            <Text style={[mono, { fontSize: 12 }]} className={c.textInk2} selectable>
+              {shortAddress(plan.recipientAddress, 10, 8)}
+            </Text>
+          </Row>
+          <Divider />
+          <Row label="Amount">
+            <Text className={`text-[18px] font-medium ${c.textInk}`}>
+              {plan.amount} {plan.asset}
+            </Text>
+          </Row>
+          <Divider />
+          <Row label="When">
+            <Text className={`text-[13px] ${c.textInk2}`}>
+              {plan.frequency === 'MONTHLY'
+                ? `Every month on day ${plan.monthlyDay ?? 1}`
+                : 'One time'}
+            </Text>
+          </Row>
+          {plan.note ? (
+            <>
+              <Divider />
+              <Row label="Note">
+                <Text className={`text-[13px] ${c.textInk2}`}>{plan.note}</Text>
+              </Row>
+            </>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {review.flags.length > 0 ? (
+        <Card className="gap-3" tone="sunken">
+          <Eyebrow>Safety check</Eyebrow>
+          {review.flags.map((flag) => (
+            <FlagRow key={flag.code} flag={flag} />
+          ))}
+        </Card>
+      ) : null}
+
+      {review.modelReads.length > 0 ? (
+        <Card className="gap-4" tone="sunken">
+          <Eyebrow>AI reads ({review.modelReads.length})</Eyebrow>
+          {review.modelReads.map((read, index) => (
+            <View key={read.role} className="gap-1.5">
+              {index > 0 ? <Divider className="mb-2" /> : null}
+              <View className="flex-row items-center justify-between">
+                <Text className={`text-[12.5px] font-semibold capitalize ${c.textInk}`}>
+                  {read.role}
+                </Text>
+                <Text className={`text-[11px] ${c.textInk3}`}>
+                  {read.ok ? `${read.latencyMs}ms` : 'failed'}
+                </Text>
+              </View>
+              <Text className={`text-[11px] ${c.textInk3}`}>{read.model}</Text>
+              {read.requestId ? (
+                <Text style={[mono, { fontSize: 10 }]} className={c.textInk3}>
+                  {read.requestId}
+                </Text>
+              ) : null}
+              <Text className={`text-[12.5px] leading-[20px] ${c.textInk2}`}>
+                {read.intent?.rationale ?? read.error ?? 'No rationale'}
+              </Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
     </View>
   );
 }
