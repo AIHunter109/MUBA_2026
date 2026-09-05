@@ -53,3 +53,4 @@ app-example
 # Move build output (sui move build) - compiled bytecode + copied dependency
 # source, regenerated locally, never hand-edited.
 move/**/build/
+.vercel
