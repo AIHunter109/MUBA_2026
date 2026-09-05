@@ -91,9 +91,16 @@ export default function AppLayoutWeb() {
     return <Redirect href="/sign-in" />;
   }
 
-  if (width >= SIDEBAR_MIN_WIDTH) {
-    return (
-      <View className="flex-1 flex-row bg-slate-950">
+  // One consistent tree shape for both layouts, with <Slot /> always at the
+  // same position - only the sidebar/bottom-bar siblings toggle. Two separate
+  // `return` branches here would give React a structurally different tree on
+  // every resize across the breakpoint, unmounting (and losing all state in)
+  // whatever screen is currently rendered inside <Slot /> - e.g. the Send chat.
+  const isSidebar = width >= SIDEBAR_MIN_WIDTH;
+
+  return (
+    <View className={`flex-1 bg-slate-950 ${isSidebar ? 'flex-row' : ''}`}>
+      {isSidebar ? (
         <View className="w-64 border-r border-slate-800 bg-slate-950 px-3 py-6">
           <Brand />
           <View className="gap-1">
@@ -108,23 +115,19 @@ export default function AppLayoutWeb() {
             </Text>
           </View>
         </View>
-        <View className="flex-1">
-          <Slot />
-        </View>
-      </View>
-    );
-  }
+      ) : null}
 
-  return (
-    <View className="flex-1 bg-slate-950">
       <View className="flex-1">
         <Slot />
       </View>
-      <View className="flex-row items-stretch gap-1 border-t border-slate-800 bg-slate-950 px-1.5 pb-2 pt-1.5">
-        {nav.map((item) => (
-          <NavLink key={item.href} item={item} variant="bottom" />
-        ))}
-      </View>
+
+      {!isSidebar ? (
+        <View className="flex-row items-stretch gap-1 border-t border-slate-800 bg-slate-950 px-1.5 pb-2 pt-1.5">
+          {nav.map((item) => (
+            <NavLink key={item.href} item={item} variant="bottom" />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
